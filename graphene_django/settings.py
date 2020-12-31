@@ -39,6 +39,8 @@ DEFAULTS = {
     # Set to True to enable v3 naming convention for choice field Enum's
     "DJANGO_CHOICE_FIELD_ENUM_V3_NAMING": False,
     "DJANGO_CHOICE_FIELD_ENUM_CUSTOM_NAME": None,
+    # Set to True to use native Enums in filters
+    "USE_ENUM_TYPE_IN_FILTER": False,
     # Use a separate path for handling subscriptions.
     "SUBSCRIPTION_PATH": None,
     # By default GraphiQL headers editor tab is enabled, set to False to hide it
