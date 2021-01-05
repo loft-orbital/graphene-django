@@ -104,12 +104,12 @@ def replace_csv_filters(filterset_class):
     for name, filter_field in six.iteritems(filterset_class.base_filters):
         filter_type = filter_field.lookup_expr
         if filter_type in ["in", "range"]:
-            assert isinstance(filter_field, BaseCSVFilter)
-            filterset_class.base_filters[name] = Filter(
-                field_name=filter_field.field_name,
-                lookup_expr=filter_field.lookup_expr,
-                label=filter_field.label,
-                method=filter_field.method,
-                exclude=filter_field.exclude,
-                **filter_field.extra
-            )
+            if isinstance(filter_field, BaseCSVFilter):
+                filterset_class.base_filters[name] = Filter(
+                    field_name=filter_field.field_name,
+                    lookup_expr=filter_field.lookup_expr,
+                    label=filter_field.label,
+                    method=filter_field.method,
+                    exclude=filter_field.exclude,
+                    **filter_field.extra
+                )
