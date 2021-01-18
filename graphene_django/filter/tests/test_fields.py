@@ -87,6 +87,7 @@ def test_filter_explicit_filterset_arguments():
         "pub_date__gt",
         "pub_date__lt",
         "reporter",
+        "reporter__in",
     )
 
 
