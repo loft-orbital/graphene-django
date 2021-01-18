@@ -38,7 +38,7 @@ class InFilter(Filter):
 
     def filter(self, qs, value):
         """
-        Override the default filter class to check first weather the list is
+        Override the default filter class to check first whether the list is
         empty or not.
         This needs to be done as in this case we expect to get an empty output
         (if not an exclude filter) but django_filter consider an empty list
