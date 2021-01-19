@@ -105,9 +105,13 @@ def replace_csv_filters(filterset_class):
     for name, filter_field in six.iteritems(filterset_class.base_filters):
         filter_type = filter_field.lookup_expr
         if filter_type in {"in", "contains", "overlap"}:
+            if isinstance(filter_field, BaseCSVFilter):
+                CustomInFilter = InFilter
 
-            class CustomInFilter(InFilter):
-                field_class = filter_field.field_class
+            else:
+
+                class CustomInFilter(InFilter):
+                    field_class = filter_field.field_class
 
             filterset_class.base_filters[name] = CustomInFilter(
                 field_name=filter_field.field_name,
@@ -119,9 +123,13 @@ def replace_csv_filters(filterset_class):
             )
 
         elif filter_type == "range":
+            if isinstance(filter_field, BaseCSVFilter):
+                CustomRangeFilter = RangeFilter
 
-            class CustomRangeFilter(RangeFilter):
-                field_class = filter_field.field_class
+            else:
+
+                class CustomRangeFilter(RangeFilter):
+                    field_class = filter_field.field_class
 
             filterset_class.base_filters[name] = CustomRangeFilter(
                 field_name=filter_field.field_name,
