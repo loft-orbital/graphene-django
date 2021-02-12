@@ -677,7 +677,7 @@ def test_should_query_filter_node_limit():
                     node {
                         id
                         firstName
-                        articles(lang: "es") {
+                        articles(lang: ES) {
                             edges {
                                 node {
                                     id
@@ -1086,7 +1086,7 @@ def test_filter_filterset_based_on_mixin():
 
             return filters
 
-        def filter_email_in(cls, queryset, name, value):
+        def filter_email_in(self, queryset, name, value):
             return queryset.filter(**{name: [value]})
 
     class NewArticleFilter(ArticleFilterMixin, ArticleFilter):

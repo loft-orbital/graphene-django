@@ -412,6 +412,7 @@ def test_should_query_node_filtering():
             model = Article
             interfaces = (Node,)
             filter_fields = ("lang",)
+            convert_choices_to_enum = False
 
     class Query(graphene.ObjectType):
         all_reporters = DjangoConnectionField(ReporterType)
@@ -444,86 +445,6 @@ def test_should_query_node_filtering():
                     node {
                         id
                         articles(lang: "es") {
-                            edges {
-                                node {
-                                    id
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    """
-
-    expected = {
-        "allReporters": {
-            "edges": [
-                {
-                    "node": {
-                        "id": "UmVwb3J0ZXJUeXBlOjE=",
-                        "articles": {
-                            "edges": [{"node": {"id": "QXJ0aWNsZVR5cGU6MQ=="}}]
-                        },
-                    }
-                }
-            ]
-        }
-    }
-
-    result = schema.execute(query)
-    assert not result.errors
-    assert result.data == expected
-
-
-@pytest.mark.skipif(
-    not DJANGO_FILTER_INSTALLED, reason="django-filter should be installed"
-)
-def test_should_query_node_filtering_native_enum(graphene_settings):
-    graphene_settings.USE_ENUM_TYPE_IN_FILTER = True
-
-    class ReporterType(DjangoObjectType):
-        class Meta:
-            model = Reporter
-            interfaces = (Node,)
-
-    class ArticleType(DjangoObjectType):
-        class Meta:
-            model = Article
-            interfaces = (Node,)
-            filter_fields = ("lang",)
-
-    class Query(graphene.ObjectType):
-        all_reporters = DjangoConnectionField(ReporterType)
-
-    r = Reporter.objects.create(
-        first_name="John", last_name="Doe", email="johndoe@example.com", a_choice=1
-    )
-    Article.objects.create(
-        headline="Article Node 1",
-        pub_date=datetime.date.today(),
-        pub_date_time=datetime.datetime.now(),
-        reporter=r,
-        editor=r,
-        lang="es",
-    )
-    Article.objects.create(
-        headline="Article Node 2",
-        pub_date=datetime.date.today(),
-        pub_date_time=datetime.datetime.now(),
-        reporter=r,
-        editor=r,
-        lang="en",
-    )
-
-    schema = graphene.Schema(query=Query)
-    query = """
-        query NodeFilteringQuery {
-            allReporters {
-                edges {
-                    node {
-                        id
-                        articles(lang: ES) {
                             edges {
                                 node {
                                     id
@@ -614,6 +535,7 @@ def test_should_query_node_multiple_filtering():
             model = Article
             interfaces = (Node,)
             filter_fields = ("lang", "headline")
+            convert_choices_to_enum = False
 
     class Query(graphene.ObjectType):
         all_reporters = DjangoConnectionField(ReporterType)
