@@ -8,8 +8,23 @@ from django_filters.utils import get_model_field, get_field_parts
 from django_filters.filters import Filter, BaseCSVFilter
 
 from .filterset import custom_filterset_factory, setup_filterset
-from .filters import InFilter, RangeFilter
+from .filters import ArrayFilter, ListFilter, RangeFilter
 from ..forms import GlobalIDFormField, GlobalIDMultipleChoiceField
+
+
+def get_field_type(registry, model, field_name):
+    """
+    Try to get a model field corresponding Graphql type from the DjangoObjectType.
+    """
+    object_type = registry.get_type_for_model(model)
+    if object_type:
+        object_type_field = object_type._meta.fields.get(field_name)
+        if object_type_field:
+            field_type = object_type_field.type
+            if isinstance(field_type, graphene.NonNull):
+                field_type = field_type.of_type
+            return field_type
+    return None
 
 
 def get_filtering_args_from_filterset(filterset_class, type):
@@ -21,22 +36,25 @@ def get_filtering_args_from_filterset(filterset_class, type):
 
     args = {}
     model = filterset_class._meta.model
+    registry = type._meta.registry
     for name, filter_field in six.iteritems(filterset_class.base_filters):
         filter_type = filter_field.lookup_expr
+        field_type = None
+        form_field = None
 
-        if name in filterset_class.declared_filters:
-            # Get the filter field from the explicitly declared filter
-            form_field = filter_field.field
-            field = convert_form_field(form_field)
-        else:
-            # Get the filter field with no explicit type declaration
+        if (
+            name not in filterset_class.declared_filters
+            or isinstance(filter_field, ListFilter)
+            or isinstance(filter_field, RangeFilter)
+            or isinstance(filter_field, ArrayFilter)
+        ):
+            # Get the filter field for filters that are no explicitly declared.
+
             required = filter_field.extra.get("required", False)
             if filter_type == "isnull":
                 field = graphene.Boolean(required=required)
             else:
                 model_field = get_model_field(model, filter_field.field_name)
-                field = None
-                form_field = None
 
                 # Get the form field either from:
                 #  1. the formfield corresponding to the model field
@@ -48,48 +66,40 @@ def get_filtering_args_from_filterset(filterset_class, type):
 
                 # First try to get the matching field type from the GraphQL DjangoObjectType
                 if model_field:
-                    registry = type._meta.registry
-                    if isinstance(form_field, forms.ModelChoiceField) or \
-                        isinstance(form_field, forms.ModelMultipleChoiceField) or \
-                        isinstance(form_field, GlobalIDMultipleChoiceField) or \
-                        isinstance(form_field, GlobalIDFormField):
+                    if (
+                        isinstance(form_field, forms.ModelChoiceField)
+                        or isinstance(form_field, forms.ModelMultipleChoiceField)
+                        or isinstance(form_field, GlobalIDMultipleChoiceField)
+                        or isinstance(form_field, GlobalIDFormField)
+                    ):
                         # Foreign key have dynamic types and filtering on a foreign key actually means filtering on its ID.
-                        object_type = registry.get_type_for_model(model_field.related_model)
-                        model_field_name = "id"
+                        field_type = get_field_type(
+                            registry, model_field.related_model, "id"
+                        )
                     else:
-                        object_type = registry.get_type_for_model(model_field.model)
-                        model_field_name = model_field.name
-                    if object_type:
-                        object_type_field = object_type._meta.fields.get(model_field_name)
-                        if object_type_field:
-                            object_type_field_type = object_type_field.type
-                            if hasattr(object_type_field_type, "of_type"):
-                                object_type_field_type = object_type_field_type.of_type
-                            try:
-                                field = object_type_field_type(
-                                    description=getattr(model_field, "help_text", ""),
-                                    required=required,
-                                )
-                            except Exception:
-                                # This method does not work for all types (like custom or dynamic types)
-                                # so we fallback on trying to convert the form field.
-                                pass
+                        field_type = get_field_type(
+                            registry, model_field.model, model_field.name
+                        )
 
-                if not field:
-                    # Fallback on converting the form field
-                    field = convert_form_field(form_field)
+        if not field_type:
+            # Fallback on converting the form field either because:
+            #  - it's an explicitly declared filters
+            #  - we did not manage to get the type from the model type
+            form_field = form_field or filter_field.field
+            field_type = convert_form_field(form_field)
 
-        if filter_type in {"in", "range", "contains", "overlap"} and \
-            (issubclass(filter_field.__class__, InFilter) or issubclass(filter_field.__class__, RangeFilter)):
-            # Replace InFilter/RangeFilter filters (`in`, `range`, `contains`, `overlap`) argument type to be a list of
-            # the same type as the field.  See comments in
-            # `replace_csv_filters` method for more details.
-            field = graphene.List(field.get_type())
+        if isinstance(filter_field, ListFilter) or isinstance(
+            filter_field, RangeFilter
+        ):
+            # Replace InFilter/RangeFilter filters (`in`, `range`) argument type to be a list of
+            # the same type as the field. See comments in `replace_csv_filters` method for more details.
+            field_type = graphene.List(field_type.get_type())
 
-        field_type = field.Argument()
-
-        field_type.description = filter_field.label
-        args[name] = field_type
+        args[name] = graphene.Argument(
+            type=field_type.get_type(),
+            description=filter_field.label,
+            required=required,
+        )
 
     return args
 
@@ -111,11 +121,15 @@ def get_filterset_class(filterset_class, **meta):
 
 def replace_csv_filters(filterset_class):
     """
-    Replace the "in", "contains", "overlap" and "range" filters (that are not explicitly declared) to not be BaseCSVFilter (BaseInFilter, BaseRangeFilter) objects anymore
-    but regular Filter objects that simply use the input value as filter argument on the queryset.
+    Replace the "in" and "range" filters (that are not explicitly declared)
+    to not be BaseCSVFilter (BaseInFilter, BaseRangeFilter) objects anymore
+    but our custom InFilter/RangeFilter filter class that use the input
+    value as filter argument on the queryset.
 
-    This is because those BaseCSVFilter are expecting a string as input with comma separated value but with GraphQl we
-    can actually have a list as input and have a proper type verification of each value in the list.
+    This is because those BaseCSVFilter are expecting a string as input with
+    comma separated values.
+    But with GraphQl we can actually have a list as input and have a proper
+    type verification of each value in the list.
 
     See issue https://github.com/graphql-python/graphene-django/issues/1068.
     """
@@ -125,9 +139,8 @@ def replace_csv_filters(filterset_class):
             continue
 
         filter_type = filter_field.lookup_expr
-        if filter_type in {"in", "contains", "overlap"}:
-
-            filterset_class.base_filters[name] = InFilter(
+        if filter_type == "in":
+            filterset_class.base_filters[name] = ListFilter(
                 field_name=filter_field.field_name,
                 lookup_expr=filter_field.lookup_expr,
                 label=filter_field.label,
@@ -135,9 +148,7 @@ def replace_csv_filters(filterset_class):
                 exclude=filter_field.exclude,
                 **filter_field.extra
             )
-
         elif filter_type == "range":
-
             filterset_class.base_filters[name] = RangeFilter(
                 field_name=filter_field.field_name,
                 lookup_expr=filter_field.lookup_expr,

@@ -40,9 +40,7 @@ def query():
             model = Reporter
             interfaces = (Node,)
             # choice filter using enum
-            filter_fields = {
-                "reporter_type": ["exact", "in"]
-            }
+            filter_fields = {"reporter_type": ["exact", "in"]}
 
     class ArticleNode(DjangoObjectType):
         class Meta:
@@ -63,9 +61,7 @@ def query():
     class PersonFilterSet(FilterSet):
         class Meta:
             model = Person
-            fields = {
-                "name": ["in"]
-            }
+            fields = {"name": ["in"]}
 
         names = filters.BaseInFilter(method="filter_names")
 
@@ -378,20 +374,16 @@ def test_enum_in_filter(query):
     """
 
     Reporter.objects.create(
-        first_name="John", last_name="Doe", email="john@doe.com",
-        reporter_type=1
+        first_name="John", last_name="Doe", email="john@doe.com", reporter_type=1
     )
     Reporter.objects.create(
-        first_name="Jean", last_name="Bon", email="jean@bon.com",
-        reporter_type=2
+        first_name="Jean", last_name="Bon", email="jean@bon.com", reporter_type=2
     )
     Reporter.objects.create(
-        first_name="Jane", last_name="Doe", email="jane@doe.com",
-        reporter_type=2
+        first_name="Jane", last_name="Doe", email="jane@doe.com", reporter_type=2
     )
     Reporter.objects.create(
-        first_name="Jack", last_name="Black", email="jack@black.com",
-        reporter_type=None
+        first_name="Jack", last_name="Black", email="jack@black.com", reporter_type=None
     )
 
     schema = Schema(query=query)

@@ -9,12 +9,19 @@ if not DJANGO_FILTER_INSTALLED:
     )
 else:
     from .fields import DjangoFilterConnectionField
-    from .filters import GlobalIDFilter, GlobalIDMultipleChoiceFilter, InFilter, RangeFilter
+    from .filters import (
+        ArrayFilter,
+        GlobalIDFilter,
+        GlobalIDMultipleChoiceFilter,
+        ListFilter,
+        RangeFilter,
+    )
 
     __all__ = [
         "DjangoFilterConnectionField",
         "GlobalIDFilter",
         "GlobalIDMultipleChoiceFilter",
-        "InFilter",
+        "ArrayFilter",
+        "ListFilter",
         "RangeFilter",
     ]

@@ -18,6 +18,7 @@ else:
         )
     )
 
+
 @pytest.fixture
 def schema():
     class ReporterType(DjangoObjectType):
@@ -41,6 +42,7 @@ def schema():
     schema = graphene.Schema(query=Query)
     return schema
 
+
 @pytest.fixture
 def reporter_article_data():
     john = Reporter.objects.create(
@@ -50,23 +52,15 @@ def reporter_article_data():
         first_name="Jane", last_name="Doe", email="janedoe@example.com", a_choice=2
     )
     Article.objects.create(
-        headline="Article Node 1",
-        reporter=john,
-        editor=john,
-        lang="es",
+        headline="Article Node 1", reporter=john, editor=john, lang="es",
     )
     Article.objects.create(
-        headline="Article Node 2",
-        reporter=john,
-        editor=john,
-        lang="en",
+        headline="Article Node 2", reporter=john, editor=john, lang="en",
     )
     Article.objects.create(
-        headline="Article Node 3",
-        reporter=jane,
-        editor=jane,
-        lang="en",
+        headline="Article Node 3", reporter=jane, editor=jane, lang="en",
     )
+
 
 def test_filter_enum_on_connection(schema, reporter_article_data):
     """
@@ -84,17 +78,12 @@ def test_filter_enum_on_connection(schema, reporter_article_data):
         }
     """
 
-    expected = {
-        "allArticles": {
-            "edges": [
-                {"node": {"headline": "Article Node 1"}},
-            ]
-        }
-    }
+    expected = {"allArticles": {"edges": [{"node": {"headline": "Article Node 1"}},]}}
 
     result = schema.execute(query)
     assert not result.errors
     assert result.data == expected
+
 
 def test_filter_on_foreign_key_enum_field(schema, reporter_article_data):
     """
@@ -124,3 +113,32 @@ def test_filter_on_foreign_key_enum_field(schema, reporter_article_data):
     result = schema.execute(query)
     assert not result.errors
     assert result.data == expected
+
+
+def test_filter_enum_field_schema_type(schema):
+    """
+    Check that the type in the filter is an enum like on the object type.
+    """
+    schema_str = str(schema)
+
+    assert (
+        """type ArticleType implements Node {
+  id: ID!
+  headline: String!
+  pubDate: Date!
+  pubDateTime: DateTime!
+  reporter: ReporterType!
+  editor: ReporterType!
+  lang: ArticleLang!
+  importance: ArticleImportance
+}"""
+        in schema_str
+    )
+
+    assert (
+        """type Query {
+  allReporters(offset: Int, before: String, after: String, first: Int, last: Int): ReporterTypeConnection
+  allArticles(offset: Int, before: String, after: String, first: Int, last: Int, lang: ArticleLang, lang_In: [ArticleLang], reporter_AChoice: ReporterAChoice, reporter_AChoice_In: [ReporterAChoice]): ArticleTypeConnection
+}"""
+        in schema_str
+    )
