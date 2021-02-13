@@ -29,7 +29,7 @@ class Film(models.Model):
     genre = models.CharField(
         max_length=2,
         help_text="Genre",
-        choices=[("do", "Documentary"), ("ot", "Other")],
+        choices=[("do", "Documentary"), ("ac", "Action"), ("ot", "Other")],
         default="ot",
     )
     reporters = models.ManyToManyField("Reporter", related_name="films")
