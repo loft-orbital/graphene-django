@@ -271,3 +271,41 @@ with this set up, you can now filter events by tags:
         name
       }
     }
+
+
+`TypedFilter`
+-------------
+
+Sometimes you the automatic detection of the filter input type is not satisfactory for what you are trying to achieve.
+You can then explicitly specify the input type you want for your filter by using a `TypedFilter`:
+
+.. code:: python
+
+    from django.db import models
+    from django_filters import FilterSet, OrderingFilter
+    import graphene
+    from graphene_django.filter import TypedFilter
+
+    class Event(models.Model):
+        name = models.CharField(max_length=50)
+
+    class EventFilterSet(FilterSet):
+        class Meta:
+            model = Event
+            fields = {
+                "name": ["exact", "contains"],
+            }
+
+        only_first = TypedFilter(input_type=graphene.Boolean, method="only_first_filter")
+
+        def only_first_filter(self, queryset, _name, value):
+            if value:
+                return queryset[:1]
+            else:
+                return queryset
+
+    class EventType(DjangoObjectType):
+        class Meta:
+            model = Event
+            interfaces = (Node,)
+            filterset_class = EventFilterSet
