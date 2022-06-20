@@ -26,10 +26,10 @@ tests_require = [
 
 
 dev_requires = [
-    "black==19.10b0",
-    "flake8==3.7.9",
-    "flake8-black==0.1.1",
-    "flake8-bugbear==20.1.4",
+    "black==22.3.0",
+    "flake8==4.0.1",
+    "flake8-black==0.3.3",
+    "flake8-bugbear==22.4.25",
 ] + tests_require
 
 setup(
@@ -60,8 +60,8 @@ setup(
     keywords="api graphql protocol rest relay graphene",
     packages=find_packages(exclude=["tests", "examples", "examples.*"]),
     install_requires=[
-        # "graphene>=3.0,<4",
-        "graphene @ git+https://github.com/loft-orbital/graphene.git@loft-v3-1.0#egg=graphene",
+        # "graphene>=3.1,<4",
+        "graphene @ git+https://github.com/loft-orbital/graphene.git@loft-v3-1.1#egg=graphene",
         "graphql-core>=3.1.0,<4",
         "graphql-relay>=3.1.1,<4",
         "Django>=2.2",

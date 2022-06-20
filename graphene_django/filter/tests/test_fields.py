@@ -1005,7 +1005,7 @@ def test_integer_field_filter_type():
 
     schema = Schema(query=Query)
 
-    assert str(schema) == dedent(
+    assert str(schema).strip() == dedent(
         """\
         type Query {
           pets(offset: Int, before: String, after: String, first: Int, last: Int, age: Int): PetTypeConnection
@@ -1056,8 +1056,7 @@ def test_integer_field_filter_type():
         interface Node {
           \"""The ID of the object\"""
           id: ID!
-        }
-    """
+        }"""
     )
 
 
@@ -1074,7 +1073,7 @@ def test_other_filter_types():
 
     schema = Schema(query=Query)
 
-    assert str(schema) == dedent(
+    assert str(schema).strip() == dedent(
         """\
         type Query {
           pets(offset: Int, before: String, after: String, first: Int, last: Int, age: Int, age_Isnull: Boolean, age_Lt: Int): PetTypeConnection
@@ -1125,8 +1124,7 @@ def test_other_filter_types():
         interface Node {
           \"""The ID of the object\"""
           id: ID!
-        }
-        """
+        }"""
     )
 
 
@@ -1226,7 +1224,10 @@ def test_filter_filterset_based_on_mixin():
         }
     }
 
-    result = schema.execute(query, variable_values={"email": reporter_1.email},)
+    result = schema.execute(
+        query,
+        variable_values={"email": reporter_1.email},
+    )
 
     assert not result.errors
     assert result.data == expected
@@ -1267,13 +1268,23 @@ def test_filter_string_contains():
     result = schema.execute(query, variables={"filter": "Ja"})
     assert not result.errors
     assert result.data == {
-        "people": {"edges": [{"node": {"name": "Jack"}}, {"node": {"name": "Jane"}},]}
+        "people": {
+            "edges": [
+                {"node": {"name": "Jack"}},
+                {"node": {"name": "Jane"}},
+            ]
+        }
     }
 
     result = schema.execute(query, variables={"filter": "o"})
     assert not result.errors
     assert result.data == {
-        "people": {"edges": [{"node": {"name": "Joe"}}, {"node": {"name": "Bob"}},]}
+        "people": {
+            "edges": [
+                {"node": {"name": "Joe"}},
+                {"node": {"name": "Bob"}},
+            ]
+        }
     }
 
 
