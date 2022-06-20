@@ -244,10 +244,9 @@ def test_schema_representation():
             \"""The ID of the object\"""
             id: ID!
           ): Node
-        }
-        """
+        }"""
     )
-    assert str(schema) == expected
+    assert str(schema).strip() == expected
 
 
 def with_local_registry(func):
@@ -515,8 +514,10 @@ class TestDjangoObjectType:
 
         schema = Schema(query=Query)
 
-        assert str(schema) == dedent(
-            """\
+        assert (
+            str(schema).strip()
+            == dedent(
+                """\
             type Query {
               pet: Pet
             }
@@ -527,6 +528,7 @@ class TestDjangoObjectType:
               cuteness: Int!
             }
             """
+            ).strip()
         )
 
     def test_django_objecttype_convert_choices_enum_list(self, PetModel):
@@ -541,8 +543,10 @@ class TestDjangoObjectType:
 
         schema = Schema(query=Query)
 
-        assert str(schema) == dedent(
-            """\
+        assert (
+            str(schema).strip()
+            == dedent(
+                """\
             type Query {
               pet: Pet
             }
@@ -562,6 +566,7 @@ class TestDjangoObjectType:
               DOG
             }
             """
+            ).strip()
         )
 
     def test_django_objecttype_convert_choices_enum_empty_list(self, PetModel):
@@ -576,8 +581,10 @@ class TestDjangoObjectType:
 
         schema = Schema(query=Query)
 
-        assert str(schema) == dedent(
-            """\
+        assert (
+            str(schema).strip()
+            == dedent(
+                """\
             type Query {
               pet: Pet
             }
@@ -588,6 +595,7 @@ class TestDjangoObjectType:
               cuteness: Int!
             }
             """
+            ).strip()
         )
 
     def test_django_objecttype_convert_choices_enum_naming_collisions(
@@ -603,8 +611,10 @@ class TestDjangoObjectType:
 
         schema = Schema(query=Query)
 
-        assert str(schema) == dedent(
-            """\
+        assert (
+            str(schema).strip()
+            == dedent(
+                """\
             type Query {
               pet: PetModelKind
             }
@@ -623,6 +633,7 @@ class TestDjangoObjectType:
               DOG
             }
             """
+            ).strip()
         )
 
     def test_django_objecttype_choices_custom_enum_name(
@@ -642,8 +653,10 @@ class TestDjangoObjectType:
 
         schema = Schema(query=Query)
 
-        assert str(schema) == dedent(
-            """\
+        assert (
+            str(schema).strip()
+            == dedent(
+                """\
             type Query {
               pet: PetModelKind
             }
@@ -662,6 +675,7 @@ class TestDjangoObjectType:
               DOG
             }
             """
+            ).strip()
         )
 
 
