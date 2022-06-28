@@ -61,7 +61,7 @@ setup(
     packages=find_packages(exclude=["tests", "examples", "examples.*"]),
     install_requires=[
         # "graphene>=3.1,<4",
-        "graphene @ git+https://github.com/loft-orbital/graphene.git@loft-v3-1.1#egg=graphene",
+        "graphene @ git+https://github.com/loft-orbital/graphene.git@loft-v3-1.2#egg=graphene",
         "graphql-core>=3.1.0,<4",
         "graphql-relay>=3.1.1,<4",
         "Django>=2.2",
