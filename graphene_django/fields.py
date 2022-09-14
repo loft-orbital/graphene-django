@@ -156,7 +156,7 @@ class DjangoConnectionField(ConnectionField):
             min(max_limit, array_length) if max_limit is not None else array_length
         )
 
-        # If after is higher than list_length, connection_from_list_slice
+        # If after is higher than array_length, connection_from_array_slice
         # would try to do a negative slicing which makes django throw an
         # AssertionError
         slice_start = min(
