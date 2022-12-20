@@ -10,7 +10,7 @@ with open("graphene_django/__init__.py", "rb") as f:
         ast.literal_eval(_version_re.search(f.read().decode("utf-8")).group(1))
     )
 
-rest_framework_require = ["djangorestframework>=3.6.3"]
+rest_framework_require = ["djangorestframework == 3.13.1"]
 
 
 tests_require = [
@@ -20,7 +20,7 @@ tests_require = [
     "coveralls",
     "mock",
     "pytz",
-    "django-filter>=22.1",
+    "django-filter>=2.3.0",
     "pytest-django>=4.5.2",
 ] + rest_framework_require
 
@@ -52,6 +52,7 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Framework :: Django",
+        "Framework :: Django :: 2.2",
         "Framework :: Django :: 3.2",
         "Framework :: Django :: 4.0",
         "Framework :: Django :: 4.1",
@@ -62,7 +63,7 @@ setup(
         "graphene @ git+https://github.com/graphql-python/graphene.git@ee1ff975d71f6590eb6933d76d12054c9839774a#egg=graphene",
         "graphql-core>=3.1.0,<4",
         "graphql-relay @ git+https://github.com/loft-orbital/graphql-relay-py.git@loft-v3.2.0-1#egg=graphql-relay",
-        "Django>=3.2",
+        "Django>=2.2.17",
         "promise>=2.1",
         "text-unidecode",
     ],
