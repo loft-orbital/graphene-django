@@ -10,7 +10,7 @@ with open("graphene_django/__init__.py", "rb") as f:
         ast.literal_eval(_version_re.search(f.read().decode("utf-8")).group(1))
     )
 
-rest_framework_require = ["djangorestframework == 3.13.1"]
+rest_framework_require = ["djangorestframework==3.13.1"]
 
 
 tests_require = [
