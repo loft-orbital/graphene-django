@@ -146,41 +146,18 @@ class DjangoConnectionField(ConnectionField):
 
         iterable = maybe_queryset(iterable)
 
-        if isinstance(iterable, QuerySet):
-            array_length = iterable.count()
-        else:
-            array_length = len(iterable)
-
-        # If after is higher than array_length, connection_from_array_slice
-        # would try to do a negative slicing which makes django throw an
-        # AssertionError
-        slice_start = min(
-            get_offset_with_default(args.get("after"), -1) + 1,
-            array_length,
-        )
-        array_slice_length = array_length - slice_start
-
-        # Impose the maximum limit via the `first` field if neither first or last are already provided
-        # (note that if any of them is provided they must be under max_limit otherwise an error is raised).
-        if (
-            max_limit is not None
-            and args.get("first", None) is None
-            and args.get("last", None) is None
-        ):
-            args["first"] = max_limit
-
         connection = connection_from_array_slice(
-            iterable[slice_start:],
-            args,
-            slice_start=slice_start,
-            array_length=array_length,
-            array_slice_length=array_slice_length,
+            array_slice=iterable,
+            args=args,
             connection_type=partial(connection_adapter, connection),
             edge_type=connection.Edge,
             page_info_type=page_info_adapter,
+            max_limit=max_limit,
         )
+
         connection.iterable = iterable
-        connection.length = array_length
+        connection.length = len(connection.edges)
+
         return connection
 
     @classmethod
