@@ -61,7 +61,7 @@ setup(
     install_requires=[
         "graphene @ git+https://github.com/graphql-python/graphene.git@ee1ff975d71f6590eb6933d76d12054c9839774a#egg=graphene",
         "graphql-core>=3.1.0,<4",
-        "graphql-relay @ git+https://github.com/loft-orbital/graphql-relay-py.git@users/lucas/improve-connection#egg=graphql-relay",
+        "graphql-relay @ git+https://github.com/loft-orbital/graphql-relay-py.git@e826099f814b893ccd22eefce53ade1f29230a73#egg=graphql-relay",
         "Django>=2.2.13",
         "promise>=2.1",
         "text-unidecode",
