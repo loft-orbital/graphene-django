@@ -16,6 +16,13 @@ from graphene.relay import ConnectionField
 from graphene.relay.connection import connection_adapter, page_info_adapter
 from graphene.types import Field, List
 
+try:
+    from graphql_sync_dataloaders import SyncFuture
+
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED = True
+except ImportError:
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED = False
+
 from .settings import graphene_settings
 from .utils import maybe_queryset
 
@@ -238,7 +245,9 @@ class DjangoConnectionField(ConnectionField):
             cls.resolve_connection, connection, args, max_limit=max_limit
         )
 
-        if Promise.is_thenable(iterable):
+        if GRAPHQL_SYNC_DATALOADERS_INSTALLED and isinstance(iterable, SyncFuture):
+            return iterable.then(on_resolve)
+        elif Promise.is_thenable(iterable):
             return Promise.resolve(iterable).then(on_resolve)
 
         return on_resolve(iterable)
