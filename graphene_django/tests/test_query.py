@@ -1074,7 +1074,7 @@ def test_proxy_model_support():
 
 
 @pytest.mark.xfail(
-    reason="While https://github.com/graphql-python/graphene-django/pull/1380#issuecomment-1646331317 is not fixed."
+    reason="Until https://github.com/graphql-python/graphene-django/pull/1380#issuecomment-1646331317 is fixed."
 )
 def test_model_inheritance_support_reverse_relationships():
     """

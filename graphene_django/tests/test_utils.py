@@ -20,7 +20,7 @@ def test_get_model_fields_no_duplication():
 
 
 @pytest.mark.xfail(
-    reason="While https://github.com/graphql-python/graphene-django/pull/1380#issuecomment-1646331317 is not fixed."
+    reason="Until https://github.com/graphql-python/graphene-django/pull/1380#issuecomment-1646331317 is fixed."
 )
 def test_get_reverse_fields_includes_proxied_models():
     reporter_fields = get_reverse_fields(Reporter, [])
