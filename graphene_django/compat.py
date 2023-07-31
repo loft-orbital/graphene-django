@@ -22,7 +22,7 @@ try:
         RangeField,
     )
 except ImportError:
-    IntegerRangeField, HStoreField, RangeField = (MissingType,) * 3
+    IntegerRangeField, HStoreField, RangeField = (MissingType,) * 4
 
     # For unit tests we fake ArrayField using JSONFields
     if any(
@@ -42,3 +42,16 @@ except ImportError:
 
     else:
         ArrayField = MissingType
+
+try:
+    from django.db.models import Choices
+except ImportError:
+    Choices = MissingType
+
+try:
+    from django.db.models import JSONField
+except ImportError:
+    try:
+        from django.contrib.postgres.fields import JSONField
+except ImportError:
+    JSONField = MissingType
