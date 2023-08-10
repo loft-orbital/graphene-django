@@ -26,10 +26,7 @@ tests_require = [
 
 
 dev_requires = [
-    "black==23.3.0",
-    "flake8==6.0.0",
-    "flake8-black==0.3.6",
-    "flake8-bugbear==23.3.23",
+    "ruff",
     "pre-commit",
 ] + tests_require
 
@@ -48,7 +45,6 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Libraries",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
