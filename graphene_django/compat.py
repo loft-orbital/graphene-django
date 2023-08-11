@@ -12,10 +12,13 @@ try:
         IntegerRangeField,
         RangeField,
     )
-    from django.db.models import Choices
-
 except ImportError:
-    IntegerRangeField, ArrayField, HStoreField, RangeField, Choices = (MissingType,) * 5
+    IntegerRangeField, ArrayField, HStoreField, RangeField = (MissingType,) * 4
+
+try:
+    from django.db.models import Choices
+except ImportError:
+    Choices = MissingType
 
 try:
     from django.db.models import JSONField
