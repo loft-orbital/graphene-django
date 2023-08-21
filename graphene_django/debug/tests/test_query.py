@@ -56,8 +56,7 @@ def test_should_query_field():
     assert result.data == expected
 
 
-@pytest.mark.parametrize("max_limit", [None, 100])
-def test_should_query_nested_field(graphene_settings, max_limit):
+def test_should_query_nested_field_0(graphene_settings, max_limit=None):
     graphene_settings.RELAY_CONNECTION_MAX_LIMIT = max_limit
 
     r1 = Reporter(last_name="ABA")
@@ -123,6 +122,74 @@ def test_should_query_nested_field(graphene_settings, max_limit):
     assert "COUNT" in result.data["_debug"]["sql"][3]["rawSql"]
     assert "tests_reporter_pets" in result.data["_debug"]["sql"][4]["rawSql"]
     assert len(result.data["_debug"]["sql"]) == 5
+
+    assert result.data["reporter"] == expected["reporter"]
+
+
+def test_should_query_nested_field_1(graphene_settings, max_limit=100):
+    graphene_settings.RELAY_CONNECTION_MAX_LIMIT = max_limit
+
+    r1 = Reporter(last_name="ABA")
+    r1.save()
+    r2 = Reporter(last_name="Griffin")
+    r2.save()
+    r2.pets.add(r1)
+    r1.pets.add(r2)
+
+    class ReporterType(DjangoObjectType):
+        class Meta:
+            model = Reporter
+            interfaces = (Node,)
+            fields = "__all__"
+
+    class Query(graphene.ObjectType):
+        reporter = graphene.Field(ReporterType)
+        debug = graphene.Field(DjangoDebug, name="_debug")
+
+        def resolve_reporter(self, info, **args):
+            return Reporter.objects.first()
+
+    query = """
+        query ReporterQuery {
+          reporter {
+            lastName
+            pets { edges { node {
+              lastName
+              pets { edges { node { lastName } } }
+            } } }
+          }
+          _debug {
+            sql {
+              rawSql
+            }
+          }
+        }
+    """
+    expected = {
+        "reporter": {
+            "lastName": "ABA",
+            "pets": {
+                "edges": [
+                    {
+                        "node": {
+                            "lastName": "Griffin",
+                            "pets": {"edges": [{"node": {"lastName": "ABA"}}]},
+                        }
+                    }
+                ]
+            },
+        }
+    }
+    schema = graphene.Schema(query=Query)
+    result = schema.execute(
+        query, context_value=context(), middleware=[DjangoDebugMiddleware()]
+    )
+    assert not result.errors
+    query = str(Reporter.objects.order_by("pk")[:1].query)
+    assert result.data["_debug"]["sql"][0]["rawSql"] == query
+    assert "tests_reporter_pets" in result.data["_debug"]["sql"][1]["rawSql"]
+    assert "tests_reporter_pets" in result.data["_debug"]["sql"][2]["rawSql"]
+    assert len(result.data["_debug"]["sql"]) == 3
 
     assert result.data["reporter"] == expected["reporter"]
 
@@ -215,10 +282,9 @@ def test_should_query_connection(graphene_settings, max_limit):
     )
     assert not result.errors
     assert result.data["allReporters"] == expected["allReporters"]
-    assert len(result.data["_debug"]["sql"]) == 2
-    assert "COUNT" in result.data["_debug"]["sql"][0]["rawSql"]
-    query = str(Reporter.objects.all()[:1].query)
-    assert result.data["_debug"]["sql"][1]["rawSql"] == query
+    assert len(result.data["_debug"]["sql"]) == 1
+    query = str(Reporter.objects.all()[:2].query)
+    assert result.data["_debug"]["sql"][0]["rawSql"] == query
 
 
 @pytest.mark.parametrize("max_limit", [None, 100])
@@ -269,10 +335,9 @@ def test_should_query_connectionfilter(graphene_settings, max_limit):
     )
     assert not result.errors
     assert result.data["allReporters"] == expected["allReporters"]
-    assert len(result.data["_debug"]["sql"]) == 2
-    assert "COUNT" in result.data["_debug"]["sql"][0]["rawSql"]
-    query = str(Reporter.objects.all()[:1].query)
-    assert result.data["_debug"]["sql"][1]["rawSql"] == query
+    assert len(result.data["_debug"]["sql"]) == 1
+    query = str(Reporter.objects.all()[:2].query)
+    assert result.data["_debug"]["sql"][0]["rawSql"] == query
 
 
 def test_should_query_stack_trace():
