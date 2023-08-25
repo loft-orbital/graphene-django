@@ -117,11 +117,9 @@ def test_should_query_nested_field_0(graphene_settings, max_limit=None):
     assert not result.errors
     query = str(Reporter.objects.order_by("pk")[:1].query)
     assert result.data["_debug"]["sql"][0]["rawSql"] == query
-    assert "COUNT" in result.data["_debug"]["sql"][1]["rawSql"]
+    assert "tests_reporter_pets" in result.data["_debug"]["sql"][1]["rawSql"]
     assert "tests_reporter_pets" in result.data["_debug"]["sql"][2]["rawSql"]
-    assert "COUNT" in result.data["_debug"]["sql"][3]["rawSql"]
-    assert "tests_reporter_pets" in result.data["_debug"]["sql"][4]["rawSql"]
-    assert len(result.data["_debug"]["sql"]) == 5
+    assert len(result.data["_debug"]["sql"]) == 3
 
     assert result.data["reporter"] == expected["reporter"]
 
