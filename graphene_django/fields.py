@@ -2,9 +2,7 @@ from functools import partial
 
 from django.db.models.query import QuerySet
 from graphql_relay import (
-    connection_from_array_slice,
     cursor_to_offset,
-    get_offset_with_default,
     offset_to_cursor,
 )
 from promise import Promise
@@ -14,6 +12,7 @@ from graphene.relay import ConnectionField
 from graphene.relay.connection import connection_adapter, page_info_adapter
 from graphene.types import Field, List
 
+from .relay import connection_from_sized_sliceable
 from .settings import graphene_settings
 from .utils import maybe_queryset
 
@@ -155,20 +154,6 @@ class DjangoConnectionField(ConnectionField):
 
         iterable = maybe_queryset(iterable)
 
-        if isinstance(iterable, QuerySet):
-            array_length = iterable.count()
-        else:
-            array_length = len(iterable)
-
-        # If after is higher than array_length, connection_from_array_slice
-        # would try to do a negative slicing which makes django throw an
-        # AssertionError
-        slice_start = min(
-            get_offset_with_default(args.get("after"), -1) + 1,
-            array_length,
-        )
-        array_slice_length = array_length - slice_start
-
         # Impose the maximum limit via the `first` field if neither first or last are already provided
         # (note that if any of them is provided they must be under max_limit otherwise an error is raised).
         if (
@@ -178,18 +163,17 @@ class DjangoConnectionField(ConnectionField):
         ):
             args["first"] = max_limit
 
-        connection = connection_from_array_slice(
-            iterable[slice_start:],
+        connection = connection_from_sized_sliceable(
+            iterable,
             args,
-            slice_start=slice_start,
-            array_length=array_length,
-            array_slice_length=array_slice_length,
             connection_type=partial(connection_adapter, connection),
             edge_type=connection.Edge,
             page_info_type=page_info_adapter,
         )
+
         connection.iterable = iterable
-        connection.length = array_length
+        connection.length = len(connection.edges)
+
         return connection
 
     @classmethod

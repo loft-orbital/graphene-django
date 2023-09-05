@@ -118,11 +118,9 @@ def test_should_query_nested_field(graphene_settings, max_limit):
     assert not result.errors
     query = str(Reporter.objects.order_by("pk")[:1].query)
     assert result.data["_debug"]["sql"][0]["rawSql"] == query
-    assert "COUNT" in result.data["_debug"]["sql"][1]["rawSql"]
+    assert "tests_reporter_pets" in result.data["_debug"]["sql"][1]["rawSql"]
     assert "tests_reporter_pets" in result.data["_debug"]["sql"][2]["rawSql"]
-    assert "COUNT" in result.data["_debug"]["sql"][3]["rawSql"]
-    assert "tests_reporter_pets" in result.data["_debug"]["sql"][4]["rawSql"]
-    assert len(result.data["_debug"]["sql"]) == 5
+    assert len(result.data["_debug"]["sql"]) == 3
 
     assert result.data["reporter"] == expected["reporter"]
 
@@ -215,10 +213,9 @@ def test_should_query_connection(graphene_settings, max_limit):
     )
     assert not result.errors
     assert result.data["allReporters"] == expected["allReporters"]
-    assert len(result.data["_debug"]["sql"]) == 2
-    assert "COUNT" in result.data["_debug"]["sql"][0]["rawSql"]
-    query = str(Reporter.objects.all()[:1].query)
-    assert result.data["_debug"]["sql"][1]["rawSql"] == query
+    assert len(result.data["_debug"]["sql"]) == 1
+    query = str(Reporter.objects.all()[:2].query)
+    assert result.data["_debug"]["sql"][0]["rawSql"] == query
 
 
 @pytest.mark.parametrize("max_limit", [None, 100])
@@ -269,10 +266,9 @@ def test_should_query_connectionfilter(graphene_settings, max_limit):
     )
     assert not result.errors
     assert result.data["allReporters"] == expected["allReporters"]
-    assert len(result.data["_debug"]["sql"]) == 2
-    assert "COUNT" in result.data["_debug"]["sql"][0]["rawSql"]
-    query = str(Reporter.objects.all()[:1].query)
-    assert result.data["_debug"]["sql"][1]["rawSql"] == query
+    assert len(result.data["_debug"]["sql"]) == 1
+    query = str(Reporter.objects.all()[:2].query)
+    assert result.data["_debug"]["sql"][0]["rawSql"] == query
 
 
 def test_should_query_stack_trace():

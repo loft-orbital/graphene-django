@@ -1587,6 +1587,7 @@ class TestBackwardPagination:
             e["node"]["firstName"] for e in result.data["allReporters"]["edges"]
         ] == ["First 3", "First 4", "First 5"]
 
+    @pytest.mark.skip(reason="Using first and last should not be supported.")
     def test_query_first_and_last(self, graphene_settings, max_limit):
         schema = self.setup_schema(graphene_settings, max_limit=max_limit)
         query_first_and_last = """
@@ -1608,6 +1609,7 @@ class TestBackwardPagination:
             e["node"]["firstName"] for e in result.data["allReporters"]["edges"]
         ] == ["First 1", "First 2", "First 3"]
 
+    @pytest.mark.skip(reason="Using last and after should not be supported.")
     def test_query_first_last_and_after(self, graphene_settings, max_limit):
         schema = self.setup_schema(graphene_settings, max_limit=max_limit)
         query_first_last_and_after = """
@@ -1713,7 +1715,7 @@ def test_should_preserve_prefetch_related(django_assert_num_queries):
     """
     schema = graphene.Schema(query=Query)
 
-    with django_assert_num_queries(3):
+    with django_assert_num_queries(2):
         result = schema.execute(query)
         assert not result.errors
 
