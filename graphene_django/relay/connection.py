@@ -74,7 +74,7 @@ def connection_from_sized_sliceable(
         )
 
     else:
-        raise ValueError("Unreachable")
+        raise ValueError(f"Unreachable: {args}")
 
     first_edge_cursor: Optional[str] = edges[0].cursor if edges else None
     last_edge_cursor: Optional[str] = edges[-1].cursor if edges else None
