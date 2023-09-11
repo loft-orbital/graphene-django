@@ -190,3 +190,11 @@ def Query(EventType):
 @pytest.fixture
 def schema(Query):
     return graphene.Schema(query=Query)
+
+
+@pytest.fixture(autouse=True)
+def execution_context_class(execution_context_class):
+    """
+    Fixture to test with custom `execution_context_class`
+    """
+    return execution_context_class
