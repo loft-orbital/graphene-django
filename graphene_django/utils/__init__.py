@@ -1,6 +1,7 @@
 from .testing import GraphQLTestCase
 from .utils import (
     DJANGO_FILTER_INSTALLED,
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED,
     bypass_get_queryset,
     camelize,
     get_model_fields,
@@ -11,6 +12,7 @@ from .utils import (
 
 __all__ = [
     "DJANGO_FILTER_INSTALLED",
+    "GRAPHQL_SYNC_DATALOADERS_INSTALLED",
     "get_reverse_fields",
     "maybe_queryset",
     "get_model_fields",

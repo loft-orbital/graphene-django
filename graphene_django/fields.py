@@ -1,5 +1,8 @@
+from collections import defaultdict
 from functools import partial
+from typing import Any
 
+from django.db.models import Value
 from django.db.models.query import QuerySet
 from graphql_relay import (
     cursor_to_offset,
@@ -14,7 +17,10 @@ from graphene.types import Field, List
 
 from .relay import connection_from_sized_sliceable
 from .settings import graphene_settings
-from .utils import maybe_queryset
+from .utils import GRAPHQL_SYNC_DATALOADERS_INSTALLED, maybe_queryset
+
+if GRAPHQL_SYNC_DATALOADERS_INSTALLED:
+    from graphql_sync_dataloaders import SyncDataLoader, SyncFuture
 
 
 class DjangoListField(Field):
@@ -133,7 +139,7 @@ class DjangoConnectionField(ConnectionField):
         return connection._meta.node.get_queryset(queryset, info)
 
     @classmethod
-    def resolve_connection(cls, connection, args, iterable, max_limit=None):
+    def resolve_connection(cls, connection, args, iterable, info, max_limit=None):
         # Remove the offset parameter and convert it to an after cursor.
         offset = args.pop("offset", None)
         after = args.get("after")
@@ -154,18 +160,61 @@ class DjangoConnectionField(ConnectionField):
         ):
             args["first"] = max_limit
 
+        if graphene_settings.USE_DATALOADERS:
+            if not hasattr(info.context, "dataloaders"):
+                info.context.dataloaders = {}
+
+            dataloader_key: str = str(info.field_nodes)
+            if dataloader_key not in info.context.dataloaders:
+
+                def load_many(keys):
+                    # keys is a list of tuples of (queryset, start, stop)
+                    qs = keys[0][0].model.objects.none()
+
+                    objects = list(
+                        qs.union(
+                            *(
+                                queryset.annotate(
+                                    _dataloader_queryset_index=Value(index)
+                                )[start:stop]
+                                for index, (queryset, start, stop) in list(
+                                    enumerate(keys)
+                                )
+                            ),
+                            all=True,
+                        ),
+                    )
+
+                    object_map: dict[str, Any] = defaultdict(list)
+                    for object_ in objects:
+                        object_map[object_._dataloader_queryset_index].append(object_)
+
+                    return [object_map.get(index, []) for index in range(len(keys))]
+
+                info.context.dataloaders[dataloader_key] = SyncDataLoader(load_many)
+
         connection = connection_from_sized_sliceable(
-            iterable,
-            args,
+            sized_sliceable=iterable,
+            args=args,
+            info=info,
             connection_type=partial(connection_adapter, connection),
             edge_type=connection.Edge,
             page_info_type=page_info_adapter,
         )
 
-        connection.iterable = iterable
-        connection.length = len(connection.edges)
+        def compute_connection(connection):
+            connection.iterable = iterable
+            connection.length = len(connection.edges)
+            return connection
 
-        return connection
+        if (
+            GRAPHQL_SYNC_DATALOADERS_INSTALLED
+            and graphene_settings.USE_DATALOADERS
+            and isinstance(connection, SyncFuture)
+        ):
+            return connection.then(compute_connection)
+        else:
+            return compute_connection(connection)
 
     @classmethod
     def connection_resolver(
@@ -217,7 +266,7 @@ class DjangoConnectionField(ConnectionField):
         # but iterable might be promise
         iterable = queryset_resolver(connection, iterable, info, args)
         on_resolve = partial(
-            cls.resolve_connection, connection, args, max_limit=max_limit
+            cls.resolve_connection, connection, args, info=info, max_limit=max_limit
         )
 
         if Promise.is_thenable(iterable):

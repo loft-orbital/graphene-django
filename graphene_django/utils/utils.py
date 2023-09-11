@@ -14,6 +14,13 @@ try:
 except ImportError:
     DJANGO_FILTER_INSTALLED = False
 
+try:
+    import graphql_sync_dataloaders  # noqa
+
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED = True
+except ImportError:
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED = False
+
 
 def isiterable(value):
     try:

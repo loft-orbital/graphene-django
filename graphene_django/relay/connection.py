@@ -10,10 +10,18 @@ from graphql_relay import (
     offset_to_cursor,
 )
 
+from graphene_django.settings import graphene_settings
+
+from ..utils import GRAPHQL_SYNC_DATALOADERS_INSTALLED
+
+if GRAPHQL_SYNC_DATALOADERS_INSTALLED:
+    from graphql_sync_dataloaders import SyncFuture
+
 
 def connection_from_sized_sliceable(
     sized_sliceable: SizedSliceable,
     args: Dict,
+    info=None,
     connection_type=Connection,
     edge_type=Edge,
     page_info_type=PageInfo,
@@ -41,33 +49,23 @@ def connection_from_sized_sliceable(
         raise ValueError("Mixing 'last' and 'after' is not supported.")
 
     if (first, after, last, before) == (None, None, None, None):
-        (
-            edges,
-            has_previous_page,
-            has_next_page,
-        ) = _handle_no_args(
+        handle_result = _handle_no_args(
             sized_sliceable=sized_sliceable,
+            info=info,
             edge_type=edge_type,
         )
 
     elif first is not None or after is not None:
-        (
-            edges,
-            has_previous_page,
-            has_next_page,
-        ) = _handle_first_after(
+        handle_result = _handle_first_after(
             sized_sliceable=sized_sliceable,
             first=first,
             after=after,
+            info=info,
             edge_type=edge_type,
         )
 
     elif last is not None or before is not None:
-        (
-            edges,
-            has_previous_page,
-            has_next_page,
-        ) = _handle_last_before(
+        handle_result = _handle_last_before(
             sized_sliceable=sized_sliceable,
             last=last,
             before=before,
@@ -77,39 +75,68 @@ def connection_from_sized_sliceable(
     else:
         raise ValueError(f"Unreachable: {args}")
 
-    first_edge_cursor: Optional[str] = edges[0].cursor if edges else None
-    last_edge_cursor: Optional[str] = edges[-1].cursor if edges else None
+    def create_connection(handle_result: Tuple[List[Edge], bool, bool]):
+        (
+            edges,
+            has_previous_page,
+            has_next_page,
+        ) = handle_result
 
-    return connection_type(
-        edges=edges,
-        pageInfo=page_info_type(
-            startCursor=first_edge_cursor,
-            endCursor=last_edge_cursor,
-            hasPreviousPage=has_previous_page,
-            hasNextPage=has_next_page,
-        ),
-    )
+        first_edge_cursor: Optional[str] = edges[0].cursor if edges else None
+        last_edge_cursor: Optional[str] = edges[-1].cursor if edges else None
+
+        connection = connection_type(
+            edges=edges,
+            pageInfo=page_info_type(
+                startCursor=first_edge_cursor,
+                endCursor=last_edge_cursor,
+                hasPreviousPage=has_previous_page,
+                hasNextPage=has_next_page,
+            ),
+        )
+
+        return connection
+
+    if GRAPHQL_SYNC_DATALOADERS_INSTALLED and isinstance(handle_result, SyncFuture):
+        return handle_result.then(create_connection)
+    else:
+        return create_connection(handle_result)
 
 
 def _handle_no_args(
     sized_sliceable: SizedSliceable,
     edge_type,
+    info=None,
 ) -> Tuple[List, bool, bool]:
     """Handle the case where no arguments are provided."""
 
-    edges = [
-        edge_type(
-            node=node,
-            cursor=offset_to_cursor(index),
-        )
-        for index, node in enumerate(sized_sliceable)
-    ]
+    def compute_edges(result):
+        edges = [
+            edge_type(
+                node=node,
+                cursor=offset_to_cursor(index),
+            )
+            for index, node in enumerate(result)
+        ]
 
-    return (
-        edges,
-        False,
-        False,
-    )
+        return (
+            edges,
+            False,
+            False,
+        )
+
+    if (
+        info
+        and GRAPHQL_SYNC_DATALOADERS_INSTALLED
+        and graphene_settings.USE_DATALOADERS
+    ):
+        return (
+            info.context.dataloaders[str(info.field_nodes)]
+            .load((sized_sliceable, None, None))
+            .then(compute_edges)
+        )
+    else:
+        return compute_edges(sized_sliceable)
 
 
 def _handle_first_after(
@@ -117,6 +144,7 @@ def _handle_first_after(
     first: Optional[int],
     after: Optional[str],
     edge_type,
+    info=None,
 ) -> Tuple[List, bool, bool]:
     """Handle the `first` and `after` arguments."""
 
@@ -140,45 +168,72 @@ def _handle_first_after(
     else:
         end_offset = start_offset + (first or 0)
 
-    trimmed_slice: SizedSliceable
-    has_previous_page: bool
-    has_next_page: bool
+    start: Optional[int]
+    stop: Optional[int]
 
     if end_offset is None:
-        trimmed_slice = sized_sliceable[start_offset:]
-        has_previous_page = start_offset > 0
-        has_next_page = False
+        start = start_offset
+        stop = None
+
+        def compute_slice(trimmed_slice):
+            has_previous_page: bool = start_offset > 0
+            has_next_page: bool = False
+
+            return trimmed_slice, has_previous_page, has_next_page
+
     else:
         # Slice off one more than we will be returning
-        intermediate_slice: SizedSliceable = sized_sliceable[
-            start_offset : end_offset + 1
+        start = start_offset
+        stop = end_offset + 1
+
+        def compute_slice(intermediate_slice):
+            # Keep intermediate `intermediate_slice_length` variable to force QuerySet evaluation.
+            intermediate_slice_length: int = len(intermediate_slice)
+
+            trimmed_slice: SizedSliceable = intermediate_slice[
+                : end_offset - start_offset
+            ]
+            trimmed_slice_length: int = len(trimmed_slice)
+
+            has_next_page: bool = intermediate_slice_length > trimmed_slice_length
+
+            # If the start offset is greater than zero, there is a previous page.
+            # However, if the provided `after` cursor is outside the bounds of the slice,
+            # enforce that `has_previous_page` is `True`.
+            has_previous_page: bool = start_offset > 0
+
+            return trimmed_slice, has_previous_page, has_next_page
+
+    def compute_edges(result):
+        trimmed_slice, has_previous_page, has_next_page = result
+
+        edges = [
+            edge_type(
+                node=node,
+                cursor=offset_to_cursor(start_offset + index),
+            )
+            for index, node in enumerate(trimmed_slice)
         ]
-        # Keep intermediate `intermediate_slice_length` variable to force QuerySet evaluation.
-        intermediate_slice_length: int = len(intermediate_slice)
 
-        trimmed_slice = intermediate_slice[: end_offset - start_offset]
-        trimmed_slice_length: int = len(trimmed_slice)
-
-        has_next_page = intermediate_slice_length > trimmed_slice_length
-
-        # If the start offset is greater than zero, there is a previous page.
-        # However, if the provided `after` cursor is outside the bounds of the slice,
-        # enforce that `has_previous_page` is `True`.
-        has_previous_page = start_offset > 0
-
-    edges = [
-        edge_type(
-            node=node,
-            cursor=offset_to_cursor(start_offset + index),
+        return (
+            edges,
+            has_previous_page,
+            has_next_page,
         )
-        for index, node in enumerate(trimmed_slice)
-    ]
 
-    return (
-        edges,
-        has_previous_page,
-        has_next_page,
-    )
+    if (
+        info
+        and GRAPHQL_SYNC_DATALOADERS_INSTALLED
+        and graphene_settings.USE_DATALOADERS
+    ):
+        return (
+            info.context.dataloaders[str(info.field_nodes)]
+            .load((sized_sliceable, start, stop))
+            .then(compute_slice)
+            .then(compute_edges)
+        )
+    else:
+        return compute_edges(compute_slice(sized_sliceable[start:stop]))
 
 
 def _handle_last_before(
