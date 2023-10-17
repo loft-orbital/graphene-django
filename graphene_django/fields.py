@@ -162,11 +162,12 @@ class DjangoConnectionField(ConnectionField):
 
         if graphene_settings.USE_DATALOADERS:
             if not hasattr(info.context, "dataloaders"):
-                setattr(info.context, "dataloaders", {})
+                info.context.dataloaders = {}
 
             dataloader_key: str = str(info.field_nodes)
 
             if dataloader_key not in info.context.dataloaders:
+
                 def load_many(keys):
                     # keys is a list of tuples of (queryset, start, stop)
                     qs = keys[0][0].model.objects.none()
