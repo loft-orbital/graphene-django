@@ -169,7 +169,7 @@ def test_should_query_list():
 
 
 @pytest.mark.parametrize("max_limit", [None, 100])
-def test_should_query_connection(graphene_settings, max_limit):
+def test_should_query_connection(use_dataloaders, graphene_settings, max_limit):
     graphene_settings.RELAY_CONNECTION_MAX_LIMIT = max_limit
 
     r1 = Reporter(last_name="ABA")
@@ -209,7 +209,10 @@ def test_should_query_connection(graphene_settings, max_limit):
     expected = {"allReporters": {"edges": [{"node": {"lastName": "ABA"}}]}}
     schema = graphene.Schema(query=Query)
     result = schema.execute(
-        query, context_value=context(), middleware=[DjangoDebugMiddleware()]
+        query,
+        context_value=context(),
+        middleware=[DjangoDebugMiddleware()],
+        execution_context_class=use_dataloaders,
     )
     assert not result.errors
     assert result.data["allReporters"] == expected["allReporters"]

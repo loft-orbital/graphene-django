@@ -85,7 +85,7 @@ def connection_from_sized_sliceable(
         first_edge_cursor: Optional[str] = edges[0].cursor if edges else None
         last_edge_cursor: Optional[str] = edges[-1].cursor if edges else None
 
-        connection = connection_type(
+        return connection_type(
             edges=edges,
             pageInfo=page_info_type(
                 startCursor=first_edge_cursor,
@@ -95,12 +95,10 @@ def connection_from_sized_sliceable(
             ),
         )
 
-        return connection
-
     if GRAPHQL_SYNC_DATALOADERS_INSTALLED and isinstance(handle_result, SyncFuture):
         return handle_result.then(create_connection)
-    else:
-        return create_connection(handle_result)
+
+    return create_connection(handle_result)
 
 
 def _handle_no_args(
@@ -126,7 +124,8 @@ def _handle_no_args(
         )
 
     if (
-        info
+        isinstance(sized_sliceable, QuerySet)
+        and info
         and GRAPHQL_SYNC_DATALOADERS_INSTALLED
         and graphene_settings.USE_DATALOADERS
     ):
@@ -135,8 +134,8 @@ def _handle_no_args(
             .load((sized_sliceable, None, None))
             .then(compute_edges)
         )
-    else:
-        return compute_edges(sized_sliceable)
+
+    return compute_edges(sized_sliceable)
 
 
 def _handle_first_after(
@@ -222,7 +221,8 @@ def _handle_first_after(
         )
 
     if (
-        info
+        isinstance(sized_sliceable, QuerySet)
+        and info
         and GRAPHQL_SYNC_DATALOADERS_INSTALLED
         and graphene_settings.USE_DATALOADERS
     ):
@@ -232,8 +232,8 @@ def _handle_first_after(
             .then(compute_slice)
             .then(compute_edges)
         )
-    else:
-        return compute_edges(compute_slice(sized_sliceable[start:stop]))
+
+    return compute_edges(compute_slice(sized_sliceable[start:stop]))
 
 
 def _handle_last_before(

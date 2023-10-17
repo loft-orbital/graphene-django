@@ -177,7 +177,7 @@ def test_should_query_postgres_fields():
     assert result.data == expected
 
 
-def test_should_node():
+def test_should_node(use_dataloaders):
     class ReporterNode(DjangoObjectType):
         class Meta:
             model = Reporter
@@ -253,7 +253,7 @@ def test_should_node():
         },
     }
     schema = graphene.Schema(query=Query)
-    result = schema.execute(query)
+    result = schema.execute(query, execution_context_class=use_dataloaders)
     assert not result.errors
     assert result.data == expected
 
@@ -316,7 +316,7 @@ def test_should_query_onetoone_fields():
     assert result.data == expected
 
 
-def test_should_query_connectionfields():
+def test_should_query_connectionfields(use_dataloaders):
     class ReporterType(DjangoObjectType):
         class Meta:
             model = Reporter
@@ -344,7 +344,7 @@ def test_should_query_connectionfields():
           }
         }
     """
-    result = schema.execute(query)
+    result = schema.execute(query, execution_context_class=use_dataloaders)
     assert not result.errors
     assert result.data == {
         "allReporters": {
@@ -354,7 +354,7 @@ def test_should_query_connectionfields():
     }
 
 
-def test_should_keep_annotations():
+def test_should_keep_annotations(use_dataloaders):
     from django.db.models import Avg, Count
 
     class ReporterType(DjangoObjectType):
@@ -409,7 +409,7 @@ def test_should_keep_annotations():
           }
         }
     """
-    result = schema.execute(query)
+    result = schema.execute(query, execution_context_class=use_dataloaders)
     assert not result.errors
 
 
