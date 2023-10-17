@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Tuple
 
+from django.db.models.query import QuerySet
 from graphql_relay import (
     Connection,
     Edge,
@@ -194,7 +195,10 @@ def _handle_last_before(
     # If defined, convert `before` cursor into an offset.
     before_offset: Optional[int] = cursor_to_offset(before) if before else None
 
-    array_length = len(sized_sliceable)
+    if isinstance(sized_sliceable, QuerySet):
+        array_length = sized_sliceable.count()
+    else:
+        array_length = len(sized_sliceable)
 
     # Calculate the `end_offset`:
     # If `before` is provided, use it as `end_offset` (cropping it to the bounds of the slice).
