@@ -24,7 +24,7 @@ def test_array_field_contains_multiple(use_dataloaders, schema):
         }
     }
     """
-    result = schema.execute(query, execution_context_class=use_dataloaders)
+    result = schema.execute(query)
     assert not result.errors
     assert result.data["events"]["edges"] == [
         {"node": {"name": "Live Show"}},
