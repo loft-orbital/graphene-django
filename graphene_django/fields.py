@@ -17,7 +17,11 @@ from graphene.types import Field, List
 
 from .relay import connection_from_sized_sliceable
 from .settings import graphene_settings
-from .utils import GRAPHQL_SYNC_DATALOADERS_INSTALLED, maybe_queryset
+from .utils import (
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED,
+    get_info_cache_key,
+    maybe_queryset,
+)
 
 if GRAPHQL_SYNC_DATALOADERS_INSTALLED:
     from graphql_sync_dataloaders import SyncDataLoader, SyncFuture
@@ -160,39 +164,46 @@ class DjangoConnectionField(ConnectionField):
         ):
             args["first"] = max_limit
 
-        if graphene_settings.USE_DATALOADERS:
-            if not hasattr(info.context, "dataloaders"):
-                info.context.dataloaders = {}
+        if info.context is not None and graphene_settings.USE_DATALOADERS:
+            try:
+                if not hasattr(info.context, "dataloaders"):
+                    info.context.dataloaders = {}
+            except AttributeError:
+                pass
+            else:
+                dataloader_key = get_info_cache_key(info)
 
-            dataloader_key: str = str(info.field_nodes)
+                if dataloader_key not in info.context.dataloaders:
 
-            if dataloader_key not in info.context.dataloaders:
+                    def load_many(keys):
+                        # keys is a list of tuples of (queryset, start, stop)
 
-                def load_many(keys):
-                    # keys is a list of tuples of (queryset, start, stop)
-                    qs = keys[0][0].model.objects.none()
+                        # We begin with an empty queryset, so we can union it with the others
+                        qs = keys[0][0].model.objects.none()
 
-                    objects = list(
-                        qs.union(
-                            *(
-                                queryset.annotate(
-                                    _dataloader_queryset_index=Value(index)
-                                )[start:stop]
-                                for index, (queryset, start, stop) in list(
-                                    enumerate(keys)
-                                )
+                        objects = list(
+                            qs.union(
+                                *(
+                                    queryset.annotate(
+                                        _dataloader_queryset_index=Value(index)
+                                    )[start:stop]
+                                    for index, (queryset, start, stop) in list(
+                                        enumerate(keys)
+                                    )
+                                ),
+                                all=True,
                             ),
-                            all=True,
-                        ),
-                    )
+                        )
 
-                    object_map: dict[str, Any] = defaultdict(list)
-                    for object_ in objects:
-                        object_map[object_._dataloader_queryset_index].append(object_)
+                        object_map: dict[str, Any] = defaultdict(list)
+                        for object_ in objects:
+                            object_map[object_._dataloader_queryset_index].append(
+                                object_
+                            )
 
-                    return [object_map.get(index, []) for index in range(len(keys))]
+                        return [object_map.get(index, []) for index in range(len(keys))]
 
-                info.context.dataloaders[dataloader_key] = SyncDataLoader(load_many)
+                    info.context.dataloaders[dataloader_key] = SyncDataLoader(load_many)
 
         connection = connection_from_sized_sliceable(
             sized_sliceable=iterable,
@@ -208,11 +219,7 @@ class DjangoConnectionField(ConnectionField):
             connection.length = len(connection.edges)
             return connection
 
-        if (
-            GRAPHQL_SYNC_DATALOADERS_INSTALLED
-            and graphene_settings.USE_DATALOADERS
-            and isinstance(connection, SyncFuture)
-        ):
+        if GRAPHQL_SYNC_DATALOADERS_INSTALLED and isinstance(connection, SyncFuture):
             return connection.then(compute_connection)
 
         return compute_connection(connection)

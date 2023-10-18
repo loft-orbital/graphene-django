@@ -57,7 +57,9 @@ def test_should_query_field():
 
 
 @pytest.mark.parametrize("max_limit", [None, 100])
-def test_should_query_nested_field(graphene_settings, max_limit):
+def test_should_query_nested_field(
+    django_assert_num_queries, use_dataloaders, graphene_settings, max_limit
+):
     graphene_settings.RELAY_CONNECTION_MAX_LIMIT = max_limit
 
     r1 = Reporter(last_name="ABA")
@@ -112,16 +114,23 @@ def test_should_query_nested_field(graphene_settings, max_limit):
         }
     }
     schema = graphene.Schema(query=Query)
-    result = schema.execute(
-        query, context_value=context(), middleware=[DjangoDebugMiddleware()]
-    )
+    with django_assert_num_queries(3) as captured:
+        result = schema.execute(
+            query,
+            context_value=context(),
+            middleware=[DjangoDebugMiddleware()],
+            execution_context_class=use_dataloaders,
+        )
     assert not result.errors
-    query = str(Reporter.objects.order_by("pk")[:1].query)
-    assert result.data["_debug"]["sql"][0]["rawSql"] == query
-    assert "tests_reporter_pets" in result.data["_debug"]["sql"][1]["rawSql"]
-    assert "tests_reporter_pets" in result.data["_debug"]["sql"][2]["rawSql"]
-    assert len(result.data["_debug"]["sql"]) == 3
+    if not use_dataloaders:
+        query = str(Reporter.objects.order_by("pk")[:1].query)
+        assert result.data["_debug"]["sql"][0]["rawSql"] == query
+        assert "tests_reporter_pets" in result.data["_debug"]["sql"][1]["rawSql"]
+        assert "tests_reporter_pets" in result.data["_debug"]["sql"][2]["rawSql"]
+        # dataloaders breaks `_debug` middleware
+        assert len(result.data["_debug"]["sql"]) == 3
 
+    assert len(captured.captured_queries) == 3
     assert result.data["reporter"] == expected["reporter"]
 
 
@@ -169,7 +178,9 @@ def test_should_query_list():
 
 
 @pytest.mark.parametrize("max_limit", [None, 100])
-def test_should_query_connection(use_dataloaders, graphene_settings, max_limit):
+def test_should_query_connection(
+    django_assert_num_queries, use_dataloaders, graphene_settings, max_limit
+):
     graphene_settings.RELAY_CONNECTION_MAX_LIMIT = max_limit
 
     r1 = Reporter(last_name="ABA")
@@ -208,21 +219,28 @@ def test_should_query_connection(use_dataloaders, graphene_settings, max_limit):
     """
     expected = {"allReporters": {"edges": [{"node": {"lastName": "ABA"}}]}}
     schema = graphene.Schema(query=Query)
-    result = schema.execute(
-        query,
-        context_value=context(),
-        middleware=[DjangoDebugMiddleware()],
-        execution_context_class=use_dataloaders,
-    )
+    with django_assert_num_queries(1) as captured:
+        result = schema.execute(
+            query,
+            context_value=context(),
+            middleware=[DjangoDebugMiddleware()],
+            execution_context_class=use_dataloaders,
+        )
     assert not result.errors
     assert result.data["allReporters"] == expected["allReporters"]
-    assert len(result.data["_debug"]["sql"]) == 1
-    query = str(Reporter.objects.all()[:2].query)
-    assert result.data["_debug"]["sql"][0]["rawSql"] == query
+    if not use_dataloaders:
+        # dataloaders breaks `_debug` middleware
+        assert len(result.data["_debug"]["sql"]) == 1
+        query = str(Reporter.objects.all()[:2].query)
+        assert result.data["_debug"]["sql"][0]["rawSql"] == query
+
+    assert len(captured.captured_queries) == 1
 
 
 @pytest.mark.parametrize("max_limit", [None, 100])
-def test_should_query_connectionfilter(graphene_settings, max_limit):
+def test_should_query_connectionfilter(
+    django_assert_num_queries, use_dataloaders, graphene_settings, max_limit
+):
     graphene_settings.RELAY_CONNECTION_MAX_LIMIT = max_limit
 
     from ...filter import DjangoFilterConnectionField
@@ -264,14 +282,22 @@ def test_should_query_connectionfilter(graphene_settings, max_limit):
     """
     expected = {"allReporters": {"edges": [{"node": {"lastName": "ABA"}}]}}
     schema = graphene.Schema(query=Query)
-    result = schema.execute(
-        query, context_value=context(), middleware=[DjangoDebugMiddleware()]
-    )
+    with django_assert_num_queries(1) as captured:
+        result = schema.execute(
+            query,
+            context_value=context(),
+            middleware=[DjangoDebugMiddleware()],
+            execution_context_class=use_dataloaders,
+        )
     assert not result.errors
     assert result.data["allReporters"] == expected["allReporters"]
-    assert len(result.data["_debug"]["sql"]) == 1
     query = str(Reporter.objects.all()[:2].query)
-    assert result.data["_debug"]["sql"][0]["rawSql"] == query
+    if not use_dataloaders:
+        # dataloaders breaks `_debug` middleware
+        assert len(result.data["_debug"]["sql"]) == 1
+        assert result.data["_debug"]["sql"][0]["rawSql"] == query
+
+    assert len(captured.captured_queries) == 1
 
 
 def test_should_query_stack_trace():

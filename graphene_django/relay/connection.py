@@ -10,9 +10,7 @@ from graphql_relay import (
     offset_to_cursor,
 )
 
-from graphene_django.settings import graphene_settings
-
-from ..utils import GRAPHQL_SYNC_DATALOADERS_INSTALLED
+from ..utils import GRAPHQL_SYNC_DATALOADERS_INSTALLED, get_info_cache_key
 
 if GRAPHQL_SYNC_DATALOADERS_INSTALLED:
     from graphql_sync_dataloaders import SyncFuture
@@ -125,15 +123,20 @@ def _handle_no_args(
 
     if (
         isinstance(sized_sliceable, QuerySet)
-        and info
-        and GRAPHQL_SYNC_DATALOADERS_INSTALLED
-        and graphene_settings.USE_DATALOADERS
+        and info is not None
+        and hasattr(info, "context")
+        and hasattr(info.context, "dataloaders")
+        and isinstance(info.context.dataloaders, dict)
     ):
-        return (
-            info.context.dataloaders[str(info.field_nodes)]
-            .load((sized_sliceable, None, None))
-            .then(compute_edges)
-        )
+        dataloader_key = get_info_cache_key(info)
+        if dataloader_key in info.context.dataloaders:
+            return (
+                info.context.dataloaders[dataloader_key]
+                .load((sized_sliceable, None, None))
+                .then(compute_edges)
+            )
+
+        raise RuntimeError(f"Could not find dataloader for {dataloader_key}")
 
     return compute_edges(sized_sliceable)
 
@@ -222,16 +225,21 @@ def _handle_first_after(
 
     if (
         isinstance(sized_sliceable, QuerySet)
-        and info
-        and GRAPHQL_SYNC_DATALOADERS_INSTALLED
-        and graphene_settings.USE_DATALOADERS
+        and info is not None
+        and hasattr(info, "context")
+        and hasattr(info.context, "dataloaders")
+        and isinstance(info.context.dataloaders, dict)
     ):
-        return (
-            info.context.dataloaders[str(info.field_nodes)]
-            .load((sized_sliceable, start, stop))
-            .then(compute_slice)
-            .then(compute_edges)
-        )
+        dataloader_key = get_info_cache_key(info)
+        if dataloader_key in info.context.dataloaders:
+            return (
+                info.context.dataloaders[dataloader_key]
+                .load((sized_sliceable, start, stop))
+                .then(compute_slice)
+                .then(compute_edges)
+            )
+
+        raise RuntimeError(f"Could not find dataloader for {dataloader_key}")
 
     return compute_edges(compute_slice(sized_sliceable[start:stop]))
 

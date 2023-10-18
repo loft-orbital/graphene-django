@@ -4,6 +4,7 @@ from .utils import (
     GRAPHQL_SYNC_DATALOADERS_INSTALLED,
     bypass_get_queryset,
     camelize,
+    get_info_cache_key,
     get_model_fields,
     get_reverse_fields,
     is_valid_django_model,
@@ -20,4 +21,5 @@ __all__ = [
     "is_valid_django_model",
     "GraphQLTestCase",
     "bypass_get_queryset",
+    "get_info_cache_key",
 ]
