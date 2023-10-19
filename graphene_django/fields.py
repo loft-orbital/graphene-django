@@ -181,18 +181,14 @@ class DjangoConnectionField(ConnectionField):
                         # We begin with an empty queryset, so we can union it with the others
                         qs = keys[0][0].model.objects.none()
 
-                        objects = list(
-                            qs.union(
-                                *(
-                                    queryset.annotate(
-                                        _dataloader_queryset_index=Value(index)
-                                    )[start:stop]
-                                    for index, (queryset, start, stop) in list(
-                                        enumerate(keys)
-                                    )
-                                ),
-                                all=True,
+                        objects = qs.union(
+                            *(
+                                queryset.annotate(
+                                    _dataloader_queryset_index=Value(index)
+                                )[start:stop]
+                                for index, (queryset, start, stop) in enumerate(keys)
                             ),
+                            all=True,
                         )
 
                         object_map: dict[str, Any] = defaultdict(list)
