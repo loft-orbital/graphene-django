@@ -9,12 +9,6 @@ from ..utils.testing import graphql_query
 from .models import APNewsReporter, CNNReporter, Film, Reporter
 
 
-@pytest.fixture
-def use_dataloaders():
-    # Dataloaders are irrelevant to this module's tests
-    pass
-
-
 def test_get_model_fields_no_duplication():
     reporter_fields = get_model_fields(Reporter)
     reporter_name_set = {field[0] for field in reporter_fields}

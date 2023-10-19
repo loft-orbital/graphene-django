@@ -18,12 +18,6 @@ from .models import (
 )
 
 
-@pytest.fixture
-def use_dataloaders():
-    # Dataloaders are irrelevant to this module's tests
-    pass
-
-
 class Reporter(DjangoObjectType):
     """Reporter description"""
 
