@@ -19,7 +19,10 @@ def graphene_settings():
     gsettings.__dict__ = settings
 
 
-@pytest.fixture(params=[(True, DeferredExecutionContext), (False, None)])
+@pytest.fixture(
+    params=[(True, DeferredExecutionContext), (False, None)],
+    ids=["dataloader_enabled", "dataloader_disabled"],
+)
 def use_dataloaders(request):
     """
     Fixture to test with and without dataloaders enabled.
