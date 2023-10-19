@@ -1,8 +1,15 @@
+import pytest
 from pytest import raises
 
 from ..registry import Registry
 from ..types import DjangoObjectType
 from .models import Reporter
+
+
+@pytest.fixture
+def use_dataloaders():
+    # Dataloaders are irrelevant to this module's tests
+    pass
 
 
 def test_should_raise_if_no_model():

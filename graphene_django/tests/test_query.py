@@ -18,6 +18,8 @@ from ..utils import DJANGO_FILTER_INSTALLED
 from .models import (
     APNewsReporter,
     Article,
+    BaseModel,
+    ChildModel,
     CNNReporter,
     Film,
     FilmDetails,
@@ -25,6 +27,14 @@ from .models import (
     Pet,
     Reporter,
 )
+
+
+@pytest.fixture(autouse=True)
+def use_dataloaders(use_dataloaders):
+    """
+    Fixture to test with and without dataloaders enabled.
+    """
+    return use_dataloaders
 
 
 def test_should_query_only_fields():
@@ -966,13 +976,6 @@ def test_should_query_dataloader_fields():
 
 
 def test_should_handle_inherited_choices():
-    class BaseModel(models.Model):
-        choice_field = models.IntegerField(choices=((0, "zero"), (1, "one")))
-
-    class ChildModel(BaseModel):
-        class Meta:
-            proxy = True
-
     class BaseType(DjangoObjectType):
         class Meta:
             model = BaseModel
@@ -2009,10 +2012,12 @@ def test_should_query_nullable_foreign_key():
     class PetType(DjangoObjectType):
         class Meta:
             model = Pet
+            fields = "__all__"
 
     class PersonType(DjangoObjectType):
         class Meta:
             model = Person
+            fields = "__all__"
 
     class Query(graphene.ObjectType):
         pet = graphene.Field(PetType, name=graphene.String(required=True))
@@ -2073,6 +2078,7 @@ def test_should_query_nullable_one_to_one_relation_with_custom_resolver():
     class FilmType(DjangoObjectType):
         class Meta:
             model = Film
+            fields = "__all__"
 
         @classmethod
         def get_queryset(cls, queryset, info):
@@ -2081,6 +2087,7 @@ def test_should_query_nullable_one_to_one_relation_with_custom_resolver():
     class FilmDetailsType(DjangoObjectType):
         class Meta:
             model = FilmDetails
+            fields = "__all__"
 
         @classmethod
         def get_queryset(cls, queryset, info):

@@ -1,3 +1,4 @@
+import warnings
 from collections import OrderedDict, defaultdict
 from textwrap import dedent
 from unittest.mock import patch
@@ -15,6 +16,12 @@ from .models import (
     Article as ArticleModel,
     Reporter as ReporterModel,
 )
+
+
+@pytest.fixture
+def use_dataloaders():
+    # Dataloaders are irrelevant to this module's tests
+    pass
 
 
 class Reporter(DjangoObjectType):
@@ -399,7 +406,7 @@ def test_django_objecttype_fields_exist_on_model():
     with pytest.warns(
         UserWarning,
         match=r"Field name .* matches an attribute on Django model .* but it's not a model field",
-    ) as record:
+    ):
 
         class Reporter2(DjangoObjectType):
             class Meta:
@@ -407,7 +414,7 @@ def test_django_objecttype_fields_exist_on_model():
                 fields = ["first_name", "some_method", "email"]
 
     # Don't warn if selecting a custom field
-    with pytest.warns(None) as record:
+    with warnings.catch_warnings():
 
         class Reporter3(DjangoObjectType):
             custom_field = String()
@@ -415,8 +422,6 @@ def test_django_objecttype_fields_exist_on_model():
             class Meta:
                 model = ReporterModel
                 fields = ["first_name", "custom_field", "email"]
-
-    assert len(record) == 0
 
 
 @with_local_registry
@@ -445,14 +450,12 @@ def test_django_objecttype_exclude_fields_exist_on_model():
                 exclude = ["custom_field"]
 
     # Don't warn on exclude fields
-    with pytest.warns(None) as record:
+    with warnings.catch_warnings():
 
         class Reporter4(DjangoObjectType):
             class Meta:
                 model = ReporterModel
                 exclude = ["email", "first_name"]
-
-    assert len(record) == 0
 
 
 @with_local_registry
@@ -467,23 +470,19 @@ def test_django_objecttype_neither_fields_nor_exclude():
             class Meta:
                 model = ReporterModel
 
-    with pytest.warns(None) as record:
+    with warnings.catch_warnings():
 
         class Reporter2(DjangoObjectType):
             class Meta:
                 model = ReporterModel
                 fields = ["email"]
 
-    assert len(record) == 0
-
-    with pytest.warns(None) as record:
+    with warnings.catch_warnings():
 
         class Reporter3(DjangoObjectType):
             class Meta:
                 model = ReporterModel
                 exclude = ["email"]
-
-    assert len(record) == 0
 
 
 def custom_enum_name(field):

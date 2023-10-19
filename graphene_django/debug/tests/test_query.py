@@ -13,6 +13,14 @@ class context:
     pass
 
 
+@pytest.fixture(autouse=True)
+def use_dataloaders(use_dataloaders):
+    """
+    Fixture to test with and without dataloaders enabled.
+    """
+    return use_dataloaders
+
+
 def test_should_query_field():
     r1 = Reporter(last_name="ABA")
     r1.save()

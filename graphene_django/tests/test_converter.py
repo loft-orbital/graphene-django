@@ -30,6 +30,12 @@ from .models import Article, Film, FilmDetails, Reporter
 # from graphene.core.types.custom_scalars import DateTime, Time, JSONString
 
 
+@pytest.fixture
+def use_dataloaders():
+    # Dataloaders are irrelevant to this module's tests
+    pass
+
+
 def assert_conversion(django_field, graphene_field, *args, **kwargs):
     _kwargs = {**kwargs, "help_text": "Custom Help Text"}
     if "null" not in kwargs:
@@ -233,7 +239,7 @@ def test_field_with_choices_convert_enum_false():
         help_text="Language", choices=(("es", "Spanish"), ("en", "English"))
     )
 
-    class TranslatedModel(models.Model):
+    class TranslatedModel2(models.Model):
         language = field
 
         class Meta:

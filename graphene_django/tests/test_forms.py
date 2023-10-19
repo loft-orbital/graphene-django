@@ -1,9 +1,16 @@
+import pytest
 from django.core.exceptions import ValidationError
 from pytest import raises
 
 from ..forms import GlobalIDFormField, GlobalIDMultipleChoiceField
 
 # 'TXlUeXBlOmFiYw==' -> 'MyType', 'abc'
+
+
+@pytest.fixture
+def use_dataloaders():
+    # Dataloaders are irrelevant to this module's tests
+    pass
 
 
 def test_global_id_valid():

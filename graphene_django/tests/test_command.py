@@ -2,9 +2,16 @@ from io import StringIO
 from textwrap import dedent
 from unittest.mock import mock_open, patch
 
+import pytest
 from django.core import management
 
 from graphene import ObjectType, Schema, String
+
+
+@pytest.fixture
+def use_dataloaders():
+    # Dataloaders are irrelevant to this module's tests
+    pass
 
 
 @patch("graphene_django.management.commands.graphql_schema.Command.save_json_file")

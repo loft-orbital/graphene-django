@@ -2,7 +2,8 @@ from collections import defaultdict
 from functools import partial
 from typing import Any
 
-from django.db.models import Value
+import django
+from django.db.models import IntegerField, Value
 from django.db.models.query import QuerySet
 from graphql_relay import (
     cursor_to_offset,
@@ -164,7 +165,11 @@ class DjangoConnectionField(ConnectionField):
         ):
             args["first"] = max_limit
 
-        if info.context is not None and graphene_settings.USE_DATALOADERS:
+        if (
+            django.VERSION[0] >= 3
+            and info.context is not None
+            and graphene_settings.USE_DATALOADERS
+        ):
             try:
                 if not hasattr(info.context, "dataloaders"):
                     info.context.dataloaders = {}
@@ -184,7 +189,10 @@ class DjangoConnectionField(ConnectionField):
                         objects = qs.union(
                             *(
                                 queryset.annotate(
-                                    _dataloader_queryset_index=Value(index)
+                                    _dataloader_queryset_index=Value(
+                                        index,
+                                        output_field=IntegerField(),
+                                    ),
                                 )[start:stop]
                                 for index, (queryset, start, stop) in enumerate(keys)
                             ),
@@ -192,6 +200,7 @@ class DjangoConnectionField(ConnectionField):
                         )
 
                         object_map: dict[str, Any] = defaultdict(list)
+
                         for object_ in objects:
                             object_map[object_._dataloader_queryset_index].append(
                                 object_

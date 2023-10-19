@@ -190,3 +190,11 @@ def Query(EventType):
 @pytest.fixture
 def schema(Query):
     return graphene.Schema(query=Query)
+
+
+@pytest.fixture(autouse=True)
+def use_dataloaders(use_dataloaders):
+    """
+    Fixture to test with and without dataloaders enabled.
+    """
+    return use_dataloaders
