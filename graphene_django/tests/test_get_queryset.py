@@ -9,11 +9,11 @@ from .models import Article, Film, FilmDetails, Reporter
 
 
 @pytest.fixture(autouse=True)
-def use_dataloaders(use_dataloaders):
+def execution_context_class(execution_context_class):
     """
-    Fixture to test with and without dataloaders enabled.
+    Fixture to test with custom `execution_context_class`
     """
-    return use_dataloaders
+    return execution_context_class
 
 
 class TestShouldCallGetQuerySetOnForeignKey:

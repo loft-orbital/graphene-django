@@ -121,22 +121,23 @@ def _handle_no_args(
             False,
         )
 
-    if (
-        isinstance(sized_sliceable, QuerySet)
-        and info is not None
-        and hasattr(info, "context")
-        and hasattr(info.context, "dataloaders")
-        and isinstance(info.context.dataloaders, dict)
-    ):
-        dataloader_key = get_info_cache_key(info)
-        if dataloader_key in info.context.dataloaders:
-            return (
-                info.context.dataloaders[dataloader_key]
-                .load((sized_sliceable, None, None))
-                .then(compute_edges)
-            )
+    try:
+        dataloaders_context = info.context.dataloaders
+    except AttributeError:
+        pass
+    else:
+        if isinstance(dataloaders_context, dict) and isinstance(
+            sized_sliceable, QuerySet
+        ):
+            dataloader_key = get_info_cache_key(info)
+            if dataloader_key in dataloaders_context:
+                return (
+                    dataloaders_context[dataloader_key]
+                    .load((sized_sliceable, None, None))
+                    .then(compute_edges)
+                )
 
-        raise RuntimeError(f"Could not find dataloader for {dataloader_key}")
+            raise RuntimeError(f"Could not find dataloader for {dataloader_key}")
 
     return compute_edges(sized_sliceable)
 

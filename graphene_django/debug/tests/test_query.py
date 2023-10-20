@@ -1,4 +1,5 @@
 import pytest
+from graphql_sync_dataloaders import DeferredExecutionContext
 
 import graphene
 from graphene.relay import Node
@@ -14,11 +15,11 @@ class context:
 
 
 @pytest.fixture(autouse=True)
-def use_dataloaders(use_dataloaders):
+def execution_context_class(execution_context_class):
     """
-    Fixture to test with and without dataloaders enabled.
+    Fixture to test with custom `execution_context_class`
     """
-    return use_dataloaders
+    return execution_context_class
 
 
 def test_should_query_field():
@@ -66,7 +67,7 @@ def test_should_query_field():
 
 @pytest.mark.parametrize("max_limit", [None, 100])
 def test_should_query_nested_field(
-    django_assert_num_queries, use_dataloaders, graphene_settings, max_limit
+    django_assert_num_queries, execution_context_class, graphene_settings, max_limit
 ):
     graphene_settings.RELAY_CONNECTION_MAX_LIMIT = max_limit
 
@@ -122,23 +123,22 @@ def test_should_query_nested_field(
         }
     }
     schema = graphene.Schema(query=Query)
-    with django_assert_num_queries(3) as captured:
+    with django_assert_num_queries(3):
         result = schema.execute(
             query,
             context_value=context(),
             middleware=[DjangoDebugMiddleware()],
-            execution_context_class=use_dataloaders,
+            execution_context_class=execution_context_class,
         )
     assert not result.errors
-    if not use_dataloaders:
+    if execution_context_class is not DeferredExecutionContext:
+        # dataloaders breaks `_debug` middleware
         query = str(Reporter.objects.order_by("pk")[:1].query)
         assert result.data["_debug"]["sql"][0]["rawSql"] == query
         assert "tests_reporter_pets" in result.data["_debug"]["sql"][1]["rawSql"]
         assert "tests_reporter_pets" in result.data["_debug"]["sql"][2]["rawSql"]
-        # dataloaders breaks `_debug` middleware
         assert len(result.data["_debug"]["sql"]) == 3
 
-    assert len(captured.captured_queries) == 3
     assert result.data["reporter"] == expected["reporter"]
 
 
@@ -187,7 +187,7 @@ def test_should_query_list():
 
 @pytest.mark.parametrize("max_limit", [None, 100])
 def test_should_query_connection(
-    django_assert_num_queries, use_dataloaders, graphene_settings, max_limit
+    django_assert_num_queries, execution_context_class, graphene_settings, max_limit
 ):
     graphene_settings.RELAY_CONNECTION_MAX_LIMIT = max_limit
 
@@ -232,11 +232,11 @@ def test_should_query_connection(
             query,
             context_value=context(),
             middleware=[DjangoDebugMiddleware()],
-            execution_context_class=use_dataloaders,
+            execution_context_class=execution_context_class,
         )
     assert not result.errors
     assert result.data["allReporters"] == expected["allReporters"]
-    if not use_dataloaders:
+    if execution_context_class is not DeferredExecutionContext:
         # dataloaders breaks `_debug` middleware
         assert len(result.data["_debug"]["sql"]) == 1
         query = str(Reporter.objects.all()[:2].query)
@@ -247,7 +247,7 @@ def test_should_query_connection(
 
 @pytest.mark.parametrize("max_limit", [None, 100])
 def test_should_query_connectionfilter(
-    django_assert_num_queries, use_dataloaders, graphene_settings, max_limit
+    django_assert_num_queries, execution_context_class, graphene_settings, max_limit
 ):
     graphene_settings.RELAY_CONNECTION_MAX_LIMIT = max_limit
 
@@ -295,12 +295,12 @@ def test_should_query_connectionfilter(
             query,
             context_value=context(),
             middleware=[DjangoDebugMiddleware()],
-            execution_context_class=use_dataloaders,
+            execution_context_class=execution_context_class,
         )
     assert not result.errors
     assert result.data["allReporters"] == expected["allReporters"]
     query = str(Reporter.objects.all()[:2].query)
-    if not use_dataloaders:
+    if execution_context_class is not DeferredExecutionContext:
         # dataloaders breaks `_debug` middleware
         assert len(result.data["_debug"]["sql"]) == 1
         assert result.data["_debug"]["sql"][0]["rawSql"] == query

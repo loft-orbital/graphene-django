@@ -30,11 +30,11 @@ from .models import (
 
 
 @pytest.fixture(autouse=True)
-def use_dataloaders(use_dataloaders):
+def execution_context_class(execution_context_class):
     """
-    Fixture to test with and without dataloaders enabled.
+    Fixture to test with custom `execution_context_class`
     """
-    return use_dataloaders
+    return execution_context_class
 
 
 def test_should_query_only_fields():
@@ -187,7 +187,7 @@ def test_should_query_postgres_fields():
     assert result.data == expected
 
 
-def test_should_node(use_dataloaders):
+def test_should_node(execution_context_class):
     class ReporterNode(DjangoObjectType):
         class Meta:
             model = Reporter
@@ -263,7 +263,7 @@ def test_should_node(use_dataloaders):
         },
     }
     schema = graphene.Schema(query=Query)
-    result = schema.execute(query, execution_context_class=use_dataloaders)
+    result = schema.execute(query, execution_context_class=execution_context_class)
     assert not result.errors
     assert result.data == expected
 
@@ -326,7 +326,7 @@ def test_should_query_onetoone_fields():
     assert result.data == expected
 
 
-def test_should_query_connectionfields(use_dataloaders):
+def test_should_query_connectionfields(execution_context_class):
     class ReporterType(DjangoObjectType):
         class Meta:
             model = Reporter
@@ -354,7 +354,7 @@ def test_should_query_connectionfields(use_dataloaders):
           }
         }
     """
-    result = schema.execute(query, execution_context_class=use_dataloaders)
+    result = schema.execute(query, execution_context_class=execution_context_class)
     assert not result.errors
     assert result.data == {
         "allReporters": {
@@ -364,7 +364,7 @@ def test_should_query_connectionfields(use_dataloaders):
     }
 
 
-def test_should_keep_annotations(use_dataloaders):
+def test_should_keep_annotations(execution_context_class):
     from django.db.models import Avg, Count
 
     class ReporterType(DjangoObjectType):
@@ -419,7 +419,7 @@ def test_should_keep_annotations(use_dataloaders):
           }
         }
     """
-    result = schema.execute(query, execution_context_class=use_dataloaders)
+    result = schema.execute(query, execution_context_class=execution_context_class)
     assert not result.errors
 
 
