@@ -14,6 +14,13 @@ try:
 except ImportError:
     DJANGO_FILTER_INSTALLED = False
 
+try:
+    import graphql_sync_dataloaders  # noqa
+
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED = True
+except ImportError:
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED = False
+
 
 def isiterable(value):
     try:
@@ -138,3 +145,15 @@ def bypass_get_queryset(resolver):
     """
     resolver._bypass_get_queryset = True
     return resolver
+
+
+def get_info_cache_key(info):
+    """
+    From https://github.com/graphql-python/graphql-core/blob/0c93b8452eed38d4f800c7e71cf6f3f3758cd1c6/src/graphql/execution/execute.py#L1612C9-L1616C10
+    """
+
+    return (
+        (info.return_type, id(info.field_nodes[0]))
+        if len(info.field_nodes) == 1  # optimize most frequent case
+        else (info.return_type, *map(id, info.field_nodes))
+    )

@@ -18,6 +18,8 @@ from ..utils import DJANGO_FILTER_INSTALLED
 from .models import (
     APNewsReporter,
     Article,
+    BaseModel,
+    ChildModel,
     CNNReporter,
     Film,
     FilmDetails,
@@ -25,6 +27,14 @@ from .models import (
     Pet,
     Reporter,
 )
+
+
+@pytest.fixture(autouse=True)
+def execution_context_class(execution_context_class):
+    """
+    Fixture to test with custom `execution_context_class`
+    """
+    return execution_context_class
 
 
 def test_should_query_only_fields():
@@ -177,7 +187,7 @@ def test_should_query_postgres_fields():
     assert result.data == expected
 
 
-def test_should_node():
+def test_should_node(execution_context_class):
     class ReporterNode(DjangoObjectType):
         class Meta:
             model = Reporter
@@ -253,7 +263,7 @@ def test_should_node():
         },
     }
     schema = graphene.Schema(query=Query)
-    result = schema.execute(query)
+    result = schema.execute(query, execution_context_class=execution_context_class)
     assert not result.errors
     assert result.data == expected
 
@@ -316,7 +326,7 @@ def test_should_query_onetoone_fields():
     assert result.data == expected
 
 
-def test_should_query_connectionfields():
+def test_should_query_connectionfields(execution_context_class):
     class ReporterType(DjangoObjectType):
         class Meta:
             model = Reporter
@@ -344,7 +354,7 @@ def test_should_query_connectionfields():
           }
         }
     """
-    result = schema.execute(query)
+    result = schema.execute(query, execution_context_class=execution_context_class)
     assert not result.errors
     assert result.data == {
         "allReporters": {
@@ -354,7 +364,7 @@ def test_should_query_connectionfields():
     }
 
 
-def test_should_keep_annotations():
+def test_should_keep_annotations(execution_context_class):
     from django.db.models import Avg, Count
 
     class ReporterType(DjangoObjectType):
@@ -409,7 +419,7 @@ def test_should_keep_annotations():
           }
         }
     """
-    result = schema.execute(query)
+    result = schema.execute(query, execution_context_class=execution_context_class)
     assert not result.errors
 
 
@@ -966,13 +976,6 @@ def test_should_query_dataloader_fields():
 
 
 def test_should_handle_inherited_choices():
-    class BaseModel(models.Model):
-        choice_field = models.IntegerField(choices=((0, "zero"), (1, "one")))
-
-    class ChildModel(BaseModel):
-        class Meta:
-            proxy = True
-
     class BaseType(DjangoObjectType):
         class Meta:
             model = BaseModel
@@ -2009,10 +2012,12 @@ def test_should_query_nullable_foreign_key():
     class PetType(DjangoObjectType):
         class Meta:
             model = Pet
+            fields = "__all__"
 
     class PersonType(DjangoObjectType):
         class Meta:
             model = Person
+            fields = "__all__"
 
     class Query(graphene.ObjectType):
         pet = graphene.Field(PetType, name=graphene.String(required=True))
@@ -2073,6 +2078,7 @@ def test_should_query_nullable_one_to_one_relation_with_custom_resolver():
     class FilmType(DjangoObjectType):
         class Meta:
             model = Film
+            fields = "__all__"
 
         @classmethod
         def get_queryset(cls, queryset, info):
@@ -2081,6 +2087,7 @@ def test_should_query_nullable_one_to_one_relation_with_custom_resolver():
     class FilmDetailsType(DjangoObjectType):
         class Meta:
             model = FilmDetails
+            fields = "__all__"
 
         @classmethod
         def get_queryset(cls, queryset, info):
