@@ -409,6 +409,7 @@ def test_django_objecttype_fields_exist_on_model():
 
     # Don't warn if selecting a custom field
     with warnings.catch_warnings():
+        warnings.simplefilter("error")
 
         class Reporter3(DjangoObjectType):
             custom_field = String()
@@ -445,6 +446,7 @@ def test_django_objecttype_exclude_fields_exist_on_model():
 
     # Don't warn on exclude fields
     with warnings.catch_warnings():
+        warnings.simplefilter("error")
 
         class Reporter4(DjangoObjectType):
             class Meta:
@@ -465,6 +467,7 @@ def test_django_objecttype_neither_fields_nor_exclude():
                 model = ReporterModel
 
     with warnings.catch_warnings():
+        warnings.simplefilter("error")
 
         class Reporter2(DjangoObjectType):
             class Meta:
@@ -472,6 +475,7 @@ def test_django_objecttype_neither_fields_nor_exclude():
                 fields = ["email"]
 
     with warnings.catch_warnings():
+        warnings.simplefilter("error")
 
         class Reporter3(DjangoObjectType):
             class Meta:
