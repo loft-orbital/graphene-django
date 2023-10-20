@@ -1,5 +1,4 @@
 from django.urls import path
-
 from graphql_sync_dataloaders import DeferredExecutionContext
 
 from graphene_django.settings import graphene_settings
