@@ -181,10 +181,11 @@ class DjangoConnectionField(ConnectionField):
                 if dataloader_key not in info.context.dataloaders:
 
                     def load_many(keys):
-                        # keys is a list of tuples of (queryset, start, stop)
+                        # `keys` is a list of tuples of (queryset, start, stop)
 
                         # We begin with an empty queryset, so we can union it with the others
-                        qs = keys[0][0].model.objects.none()
+                        first_queryset, _, _ = keys[0]
+                        qs = first_queryset.model.objects.none()
 
                         objects = qs.union(
                             *(
