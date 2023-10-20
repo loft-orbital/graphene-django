@@ -20,7 +20,7 @@ tests_require = [
     "coveralls",
     "mock",
     "pytz",
-    "django-filter>=22.1",
+    "django-filter>=21.1",
     "pytest-django>=4.5.2",
 ] + rest_framework_require
 
@@ -59,10 +59,11 @@ setup(
     keywords="api graphql protocol rest relay graphene",
     packages=find_packages(exclude=["tests", "examples", "examples.*"]),
     install_requires=[
-        "graphene>=3.0,<4",
+        "graphene @ git+https://github.com/graphql-python/graphene.git@ee1ff975d71f6590eb6933d76d12054c9839774a#egg=graphene",
         "graphql-core>=3.1.0,<4",
         "graphql-relay>=3.1.1,<4",
-        "Django>=3.2",
+        "graphql-sync-dataloaders @ git+https://github.com/loft-orbital/graphql-sync-dataloaders.git@loft-1.0.1#egg=graphql-sync-dataloaders",
+        "Django>=2.2.13",
         "promise>=2.1",
         "text-unidecode",
     ],

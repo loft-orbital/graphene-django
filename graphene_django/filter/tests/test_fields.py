@@ -133,7 +133,7 @@ def test_filter_shortcut_filterset_extra_meta():
     assert "headline" not in field.filterset_class.get_fields()
 
 
-def test_filter_shortcut_filterset_context():
+def test_filter_shortcut_filterset_context(execution_context_class):
     class ArticleContextFilter(django_filters.FilterSet):
         class Meta:
             model = Article
@@ -181,7 +181,11 @@ def test_filter_shortcut_filterset_context():
     }
     """
     schema = Schema(query=Query)
-    result = schema.execute(query, context_value=context())
+    result = schema.execute(
+        query,
+        context_value=context(),
+        execution_context_class=execution_context_class,
+    )
     assert not result.errors
 
     assert len(result.data["contextArticles"]["edges"]) == 1

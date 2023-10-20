@@ -1,4 +1,5 @@
 import pytest
+from graphql_sync_dataloaders import DeferredExecutionContext
 
 from graphene_django.settings import graphene_settings as gsettings
 
@@ -15,4 +16,21 @@ def reset_registry_fixture(db):
 def graphene_settings():
     settings = dict(gsettings.__dict__)
     yield gsettings
+    gsettings.__dict__ = settings
+
+
+@pytest.fixture(
+    params=[(True, DeferredExecutionContext), (False, None)],
+    ids=["dataloaders_enabled", "dataloaders_disabled"],
+)
+def execution_context_class(request):
+    """
+    Fixture to test with custom `execution_context_class`
+    """
+
+    use_dataloaders, execution_context_class = request.param
+
+    settings = dict(gsettings.__dict__)
+    gsettings.USE_DATALOADERS = use_dataloaders
+    yield execution_context_class
     gsettings.__dict__ = settings
