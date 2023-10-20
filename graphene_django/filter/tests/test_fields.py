@@ -793,7 +793,7 @@ def test_order_by():
 
     query = """
         query NodeFilteringQuery {
-            allReporters(orderBy: "-firtsnaMe") {
+            allReporters(orderBy: "-firstname") {
                 edges {
                     node {
                         firstName
@@ -806,7 +806,7 @@ def test_order_by():
     assert result.errors
 
 
-def test_order_by_is_perserved():
+def test_order_by_is_preserved():
     class ReporterType(DjangoObjectType):
         class Meta:
             model = Reporter

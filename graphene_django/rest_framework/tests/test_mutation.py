@@ -4,7 +4,7 @@ import pytest
 from pytest import raises
 from rest_framework import serializers
 
-from graphene import Field, ResolveInfo
+from graphene import Field, ResolveInfo, String
 from graphene.types.inputobjecttype import InputObjectType
 
 from ...compat import Choices, MissingType
@@ -105,6 +105,16 @@ def test_exclude_fields():
     assert "errors" in MyMutation._meta.fields
     assert "cool_name" in MyMutation.Input._meta.fields
     assert "created" not in MyMutation.Input._meta.fields
+
+
+def test_model_serializer_optional_fields():
+    class MyMutation(SerializerMutation):
+        class Meta:
+            serializer_class = MyModelSerializer
+            optional_fields = ("cool_name",)
+
+    assert "cool_name" in MyMutation.Input._meta.fields
+    assert MyMutation.Input._meta.fields["cool_name"].type == String
 
 
 def test_write_only_field():
