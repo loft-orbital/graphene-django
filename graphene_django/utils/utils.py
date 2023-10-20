@@ -158,3 +158,8 @@ def get_info_cache_key(info):
         if len(info.field_nodes) == 1  # optimize most frequent case
         else (info.return_type, *map(id, info.field_nodes))
     )
+
+
+_DJANGO_VERSION_AT_LEAST_4_2 = django.VERSION[0] > 4 or (
+    django.VERSION[0] >= 4 and django.VERSION[1] >= 2
+)
