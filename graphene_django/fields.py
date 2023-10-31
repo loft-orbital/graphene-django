@@ -278,7 +278,25 @@ class DjangoConnectionField(ConnectionField):
             iterable = default_manager
         # thus the iterable gets refiltered by resolve_queryset
         # but iterable might be promise
-        iterable = queryset_resolver(connection, iterable, info, args)
+
+        if info.context is not None:
+            try:
+                if not hasattr(info.context, "cache"):
+                    info.context.cache = {"queryset_resolver": {}}
+            except AttributeError:
+                iterable = queryset_resolver(connection, iterable, info, args)
+            else:
+                cache_key = get_info_cache_key(info)
+
+                if cache_key not in info.context.cache:
+                    info.context.cache["queryset_resolver"][
+                        cache_key
+                    ] = queryset_resolver(connection, iterable, info, args)
+
+                iterable = info.context.cache["queryset_resolver"][cache_key]
+        else:
+            iterable = queryset_resolver(connection, iterable, info, args)
+
         on_resolve = partial(
             cls.resolve_connection, connection, args, info=info, max_limit=max_limit
         )
