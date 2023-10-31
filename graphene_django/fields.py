@@ -288,7 +288,7 @@ class DjangoConnectionField(ConnectionField):
             else:
                 cache_key = get_info_cache_key(info)
 
-                if cache_key not in info.context.cache:
+                if cache_key not in info.context.cache["queryset_resolver"]:
                     info.context.cache["queryset_resolver"][
                         cache_key
                     ] = queryset_resolver(connection, iterable, info, args)
