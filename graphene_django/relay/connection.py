@@ -297,12 +297,16 @@ def _handle_last_before(
 
 
 def _use_connection_dataloaders(info, sized_sliceable):
-    return (
+    if (
         django.VERSION[0] >= 3
         and graphene_settings.USE_DATALOADERS
-        and isinstance(sized_sliceable, QuerySet)
-        and info is not None
-        and hasattr(info, "context")
-        and hasattr(info.context, "dataloaders")
-        and isinstance(info.context.dataloaders, dict)
-    )
+    ):
+        try:
+            return (
+                isinstance(info.context.dataloaders, dict)
+                and isinstance(sized_sliceable, QuerySet)
+            )
+        except AttributeError:
+            return False
+            
+return False
