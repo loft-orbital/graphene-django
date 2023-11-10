@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Tuple
 
+import django
 from django.db.models.query import QuerySet
 from graphql_relay import (
     Connection,
@@ -10,6 +11,7 @@ from graphql_relay import (
     offset_to_cursor,
 )
 
+from ..settings import graphene_settings
 from ..utils import GRAPHQL_SYNC_DATALOADERS_INSTALLED, get_info_cache_key
 
 if GRAPHQL_SYNC_DATALOADERS_INSTALLED:
@@ -121,23 +123,16 @@ def _handle_no_args(
             False,
         )
 
-    try:
-        dataloaders_context = info.context.dataloaders
-    except AttributeError:
-        pass
-    else:
-        if isinstance(dataloaders_context, dict) and isinstance(
-            sized_sliceable, QuerySet
-        ):
-            dataloader_key = get_info_cache_key(info)
-            if dataloader_key in dataloaders_context:
-                return (
-                    dataloaders_context[dataloader_key]
-                    .load((sized_sliceable, None, None))
-                    .then(compute_edges)
-                )
+    if _use_connection_dataloaders(info, sized_sliceable):
+        dataloader_key = get_info_cache_key(info)
+        if dataloader_key in info.context.dataloaders:
+            return (
+                info.context.dataloaders[dataloader_key]
+                .load((sized_sliceable, None, None))
+                .then(compute_edges)
+            )
 
-            raise RuntimeError(f"Could not find dataloader for {dataloader_key}")
+        raise RuntimeError(f"Could not find dataloader for {dataloader_key}")
 
     return compute_edges(sized_sliceable)
 
@@ -224,13 +219,7 @@ def _handle_first_after(
             has_next_page,
         )
 
-    if (
-        isinstance(sized_sliceable, QuerySet)
-        and info is not None
-        and hasattr(info, "context")
-        and hasattr(info.context, "dataloaders")
-        and isinstance(info.context.dataloaders, dict)
-    ):
+    if _use_connection_dataloaders(info, sized_sliceable):
         dataloader_key = get_info_cache_key(info)
         if dataloader_key in info.context.dataloaders:
             return (
@@ -305,3 +294,18 @@ def _handle_last_before(
         has_previous_page,
         has_next_page,
     )
+
+
+def _use_connection_dataloaders(info, sized_sliceable):
+    if (
+        django.VERSION[0] >= 3
+        and graphene_settings.USE_DATALOADERS
+        and isinstance(sized_sliceable, QuerySet)
+        and info is not None
+        and hasattr(info, "context")
+        and hasattr(info.context, "dataloaders")
+        and isinstance(info.context.dataloaders, dict)
+    ):
+        return True
+
+    return False
