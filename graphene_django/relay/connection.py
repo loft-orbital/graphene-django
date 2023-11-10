@@ -297,7 +297,7 @@ def _handle_last_before(
 
 
 def _use_connection_dataloaders(info, sized_sliceable):
-    if (
+    return (
         django.VERSION[0] >= 3
         and graphene_settings.USE_DATALOADERS
         and isinstance(sized_sliceable, QuerySet)
@@ -305,7 +305,4 @@ def _use_connection_dataloaders(info, sized_sliceable):
         and hasattr(info, "context")
         and hasattr(info.context, "dataloaders")
         and isinstance(info.context.dataloaders, dict)
-    ):
-        return True
-
-    return False
+    )
