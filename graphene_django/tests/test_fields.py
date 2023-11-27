@@ -652,6 +652,9 @@ class TestDjangoListField:
     def test_django_dataloaded_list_field(
         self, execution_context_class, django_assert_max_num_queries
     ):
+        class Context:
+            pass
+
         class Article(DjangoObjectType):
             class Meta:
                 model = ArticleModel
@@ -720,7 +723,9 @@ class TestDjangoListField:
 
         with django_assert_max_num_queries(3) as captured:
             result = schema.execute(
-                query, execution_context_class=execution_context_class
+                query,
+                execution_context_class=execution_context_class,
+                context_value=Context(),
             )
 
         assert not result.errors
@@ -781,7 +786,9 @@ class TestDjangoListField:
 
         with django_assert_max_num_queries(3) as captured:
             result = schema.execute(
-                query, execution_context_class=execution_context_class
+                query,
+                execution_context_class=execution_context_class,
+                context_value=Context(),
             )
 
         assert not result.errors

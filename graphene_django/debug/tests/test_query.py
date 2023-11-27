@@ -10,7 +10,7 @@ from ..middleware import DjangoDebugMiddleware
 from ..types import DjangoDebug
 
 
-class context:
+class Context:
     pass
 
 
@@ -59,7 +59,7 @@ def test_should_query_field():
     }
     schema = graphene.Schema(query=Query)
     result = schema.execute(
-        query, context_value=context(), middleware=[DjangoDebugMiddleware()]
+        query, context_value=Context(), middleware=[DjangoDebugMiddleware()]
     )
     assert not result.errors
     assert result.data == expected
@@ -126,7 +126,7 @@ def test_should_query_nested_field(
     with django_assert_num_queries(3):
         result = schema.execute(
             query,
-            context_value=context(),
+            context_value=Context(),
             middleware=[DjangoDebugMiddleware()],
             execution_context_class=execution_context_class,
         )
@@ -179,7 +179,7 @@ def test_should_query_list():
     }
     schema = graphene.Schema(query=Query)
     result = schema.execute(
-        query, context_value=context(), middleware=[DjangoDebugMiddleware()]
+        query, context_value=Context(), middleware=[DjangoDebugMiddleware()]
     )
     assert not result.errors
     assert result.data == expected
@@ -230,7 +230,7 @@ def test_should_query_connection(
     with django_assert_num_queries(1) as captured:
         result = schema.execute(
             query,
-            context_value=context(),
+            context_value=Context(),
             middleware=[DjangoDebugMiddleware()],
             execution_context_class=execution_context_class,
         )
@@ -293,7 +293,7 @@ def test_should_query_connectionfilter(
     with django_assert_num_queries(1) as captured:
         result = schema.execute(
             query,
-            context_value=context(),
+            context_value=Context(),
             middleware=[DjangoDebugMiddleware()],
             execution_context_class=execution_context_class,
         )
@@ -337,7 +337,7 @@ def test_should_query_stack_trace():
     """
     schema = graphene.Schema(query=Query)
     result = schema.execute(
-        query, context_value=context(), middleware=[DjangoDebugMiddleware()]
+        query, context_value=Context(), middleware=[DjangoDebugMiddleware()]
     )
     assert result.errors
     assert len(result.data["_debug"]["exceptions"])
