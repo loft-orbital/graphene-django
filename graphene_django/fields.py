@@ -1,7 +1,6 @@
 from collections import defaultdict
 from functools import partial
 from typing import Any
-from uuid import UUID
 
 import django
 from django.db.models import IntegerField, Value
@@ -145,7 +144,7 @@ class DjangoDataloadedListField(Field):
 
                 if dataloader_key not in info.context.dataloaders:
 
-                    def load_many(keys: list[UUID | str]):
+                    def load_many(keys):
                         results_by_ids = defaultdict(list)
                         lookup = {
                             f"{related_name}_id__in": keys,
