@@ -96,7 +96,10 @@ By default it will resolve the default related queryset of the Django model, but
       ingredients_dataloaded_custom_resolver = DjangoDataloadedListField("ingredients")
 
       def resolve_ingredients_dataloaded_custom_resolver(self, info):
-         return self.ingredients.filter(name = "Sugar")
+         # Important: the queryset returned by the resolver must derivate
+         # from the root model:
+         # return self.ingredient.filter(name = "Sugar")  # bad
+         return Ingredient.objects.filter(name = "Sugar") # good
 
    class IngredientType(DjangoObjectType):
       class Meta:
