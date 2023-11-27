@@ -76,6 +76,37 @@ published and have a title:
 
    schema = Schema(query=Query)
 
+DjangoDataloadedListField
+-------------------------
+
+``DjangoDataloadedListField`` allows you to define a dataloaded list of :ref:`DjangoObjectType<queries-objecttypes>`'s from a related :ref:`DjangoObjectType<queries-objecttypes>`.
+By default it will resolve the default related queryset of the Django model, but a custom resolver can be defined.
+
+.. code:: python
+
+   from graphene import ObjectType, Schema
+   from graphene_django import DjangoDataloadedListField
+
+   class RecipeType(DjangoObjectType):
+      class Meta:
+         model = Recipe
+         fields = "__all__"
+
+      ingredients_dataloaded = DjangoDataloadedListField("ingredients")
+      ingredients_dataloaded_custom_resolver = DjangoDataloadedListField("ingredients")
+
+      def resolve_ingredients_dataloaded_custom_resolver(self, info):
+         return self.ingredients.filter(name = "Sugar")
+
+   class IngredientType(DjangoObjectType):
+      class Meta:
+         model = Ingredient
+         fields = "__all__"
+
+   class Query(ObjectType):
+      recipes = DjangoListField(RecipeType)
+
+   schema = Schema(query=Query)
 
 DjangoConnectionField
 ---------------------
