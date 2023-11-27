@@ -3,10 +3,11 @@ import re
 
 import pytest
 from django.db.models import Count, Prefetch
+from graphql_sync_dataloaders import DeferredExecutionContext
 
 from graphene import List, NonNull, ObjectType, Schema, String
 
-from ..fields import DjangoListField
+from ..fields import DjangoDataloadedListField, DjangoListField
 from ..types import DjangoObjectType
 from .models import (
     Article as ArticleModel,
@@ -647,3 +648,181 @@ class TestDjangoListField:
             r'SELECT .* FROM "tests_film" INNER JOIN "tests_film_reporters" .* LEFT OUTER JOIN "tests_filmdetails"',
             captured.captured_queries[1]["sql"],
         )
+
+    def test_django_dataloaded_list_field(
+        self, execution_context_class, django_assert_max_num_queries
+    ):
+        class Article(DjangoObjectType):
+            class Meta:
+                model = ArticleModel
+                fields = ("headline",)
+
+        class Reporter(DjangoObjectType):
+            class Meta:
+                model = ReporterModel
+                fields = ("first_name", "articles")
+
+            articles_dataloaded = DjangoDataloadedListField(Article)
+            articles_dataloaded_with_custom_resolver = DjangoDataloadedListField(
+                Article
+            )
+
+            def resolve_articles_dataloaded_with_custom_resolver(self, info):
+                return ArticleModel.objects.filter(headline__contains="Not")
+
+        class Query(ObjectType):
+            reporters = DjangoListField(Reporter)
+
+        schema = Schema(query=Query)
+
+        r1 = ReporterModel.objects.create(first_name="Tara", last_name="West")
+        ArticleModel.objects.create(
+            headline="Amazing news",
+            reporter=r1,
+            pub_date=datetime.date.today(),
+            pub_date_time=datetime.datetime.now(),
+            editor=r1,
+        )
+        ArticleModel.objects.create(
+            headline="Not so good news",
+            reporter=r1,
+            pub_date=datetime.date.today(),
+            pub_date_time=datetime.datetime.now(),
+            editor=r1,
+        )
+
+        r2 = ReporterModel.objects.create(first_name="Debra", last_name="Payne")
+        ArticleModel.objects.create(
+            headline="Good news",
+            reporter=r2,
+            pub_date=datetime.date.today(),
+            pub_date_time=datetime.datetime.now(),
+            editor=r2,
+        )
+        ArticleModel.objects.create(
+            headline="Not such an amazing news",
+            reporter=r2,
+            pub_date=datetime.date.today(),
+            pub_date_time=datetime.datetime.now(),
+            editor=r2,
+        )
+
+        query = """
+            query {
+                reporters {
+                    firstName
+                    articlesDataloaded {
+                        headline
+                    }
+                }
+            }
+        """
+
+        with django_assert_max_num_queries(3) as captured:
+            result = schema.execute(
+                query, execution_context_class=execution_context_class
+            )
+
+        assert not result.errors
+        assert result.data == {
+            "reporters": [
+                {
+                    "firstName": "Tara",
+                    "articlesDataloaded": [
+                        {"headline": "Amazing news"},
+                        {"headline": "Not so good news"},
+                    ],
+                },
+                {
+                    "firstName": "Debra",
+                    "articlesDataloaded": [
+                        {"headline": "Good news"},
+                        {"headline": "Not such an amazing news"},
+                    ],
+                },
+            ]
+        }
+
+        if execution_context_class == DeferredExecutionContext:
+            assert len(captured.captured_queries) == 2
+            assert re.match(
+                r'SELECT .* FROM "tests_reporter"',
+                captured.captured_queries[0]["sql"],
+            )
+            assert re.match(
+                r'SELECT .* FROM "tests_article" WHERE "tests_article"."reporter_id" IN \(\d+, \d+\) .*',
+                captured.captured_queries[1]["sql"],
+            )
+        else:
+            assert len(captured.captured_queries) == 3
+            assert re.match(
+                r'SELECT .* FROM "tests_reporter"',
+                captured.captured_queries[0]["sql"],
+            )
+            assert re.match(
+                r'SELECT .* FROM "tests_article" WHERE "tests_article"."reporter_id" = \d+ .*',
+                captured.captured_queries[1]["sql"],
+            )
+            assert re.match(
+                r'SELECT .* FROM "tests_article" WHERE "tests_article"."reporter_id" = \d+ .*',
+                captured.captured_queries[2]["sql"],
+            )
+
+        query = """
+            query {
+                reporters {
+                    firstName
+                    articlesDataloadedWithCustomResolver {
+                        headline
+                    }
+                }
+            }
+        """
+
+        with django_assert_max_num_queries(3) as captured:
+            result = schema.execute(
+                query, execution_context_class=execution_context_class
+            )
+
+        assert not result.errors
+        assert result.data == {
+            "reporters": [
+                {
+                    "firstName": "Tara",
+                    "articlesDataloadedWithCustomResolver": [
+                        {"headline": "Not so good news"},
+                    ],
+                },
+                {
+                    "firstName": "Debra",
+                    "articlesDataloadedWithCustomResolver": [
+                        {"headline": "Not such an amazing news"},
+                    ],
+                },
+            ]
+        }
+
+        if execution_context_class == DeferredExecutionContext:
+            assert len(captured.captured_queries) == 2
+            assert re.match(
+                r'SELECT .* FROM "tests_reporter"',
+                captured.captured_queries[0]["sql"],
+            )
+            assert re.match(
+                r"SELECT .* FROM \"tests_article\" WHERE \(\"tests_article\".\"headline\" LIKE \'%Not%\' ESCAPE \'\\\' AND \"tests_article\".\"reporter_id\" IN \(\d+, \d+\)\) .*",
+                captured.captured_queries[1]["sql"],
+            )
+        else:
+            assert len(captured.captured_queries) == 3
+            assert re.match(
+                r'SELECT .* FROM "tests_reporter"',
+                captured.captured_queries[0]["sql"],
+            )
+            assert re.match(
+                r"SELECT .* FROM \"tests_article\" WHERE \(\"tests_article\".\"headline\" LIKE \'%Not%\' ESCAPE \'\\\' AND \"tests_article\".\"reporter_id\" = \d+\) .*",
+                captured.captured_queries[1]["sql"],
+            )
+            assert re.match(
+                r"SELECT .* FROM \"tests_article\" WHERE \(\"tests_article\".\"headline\" LIKE \'%Not%\' ESCAPE \'\\\' AND \"tests_article\".\"reporter_id\" = \d+\) .*",
+                captured.captured_queries[2]["sql"],
+            )

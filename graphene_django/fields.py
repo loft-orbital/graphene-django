@@ -1,6 +1,7 @@
 from collections import defaultdict
 from functools import partial
 from typing import Any
+from uuid import UUID
 
 import django
 from django.db.models import IntegerField, Value
@@ -85,8 +86,14 @@ class DjangoListField(Field):
 
 
 class DjangoDataloadedListField(Field):
-    def __init__(self, _type, *args, **kwargs):
-        from .types import DjangoObjectType
+    def __init__(
+        self,
+        _type,
+        *args,
+        related_name=None,
+        **kwargs,
+    ):
+        from graphene_django.types import DjangoObjectType
 
         if isinstance(_type, NonNull):
             _type = _type.of_type
@@ -97,6 +104,8 @@ class DjangoDataloadedListField(Field):
         assert issubclass(
             self._underlying_type, DjangoObjectType
         ), "DjangoListField only accepts DjangoObjectType types"
+
+        self._related_name = related_name
 
     @property
     def _underlying_type(self):
@@ -114,8 +123,9 @@ class DjangoDataloadedListField(Field):
 
     @staticmethod
     def list_resolver(
-        django_object_type, resolver, default_manager, root, info, **args
+        related_name, django_object_type, resolver, default_manager, root, info, **args
     ):
+        related_name = related_name or root._meta.model_name
         queryset = maybe_queryset(resolver(root, info, **args))
         if queryset is None:
             queryset = maybe_queryset(default_manager)
@@ -124,7 +134,37 @@ class DjangoDataloadedListField(Field):
             # Pass queryset to the DjangoObjectType get_queryset method
             queryset = maybe_queryset(django_object_type.get_queryset(queryset, info))
 
-        return queryset
+        if info.context is not None and graphene_settings.USE_DATALOADERS:
+            try:
+                if not hasattr(info.context, "dataloaders"):
+                    info.context.dataloaders = {}
+            except AttributeError:
+                pass
+            else:
+                dataloader_key = get_info_cache_key(info)
+
+                if dataloader_key not in info.context.dataloaders:
+
+                    def load_many(keys: list[UUID | str]):
+                        results_by_ids = defaultdict(list)
+                        lookup = {
+                            f"{related_name}_id__in": keys,
+                        }
+
+                        qs: QuerySet = queryset.filter(**lookup)
+
+                        for result in qs.iterator():
+                            results_by_ids[
+                                getattr(result, f"{related_name}_id")
+                            ].append(result)
+
+                        return [results_by_ids.get(id, []) for id in keys]
+
+                    info.context.dataloaders[dataloader_key] = SyncDataLoader(load_many)
+
+                return info.context.dataloaders[dataloader_key].load(root.id)
+
+        return queryset.filter(**{f"{related_name}_id": root.id})
 
     def wrap_resolve(self, parent_resolver):
         resolver = super().wrap_resolve(parent_resolver)
@@ -134,6 +174,7 @@ class DjangoDataloadedListField(Field):
         django_object_type = _type.of_type.of_type
         return partial(
             self.list_resolver,
+            self._related_name,
             django_object_type,
             resolver,
             self.get_manager(),
@@ -297,7 +338,7 @@ class DjangoConnectionField(ConnectionField):
         enforce_first_or_last,
         root,
         info,
-        **args
+        **args,
     ):
         first = args.get("first")
         last = args.get("last")
