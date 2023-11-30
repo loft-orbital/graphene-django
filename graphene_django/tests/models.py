@@ -28,6 +28,7 @@ class FilmDetails(models.Model):
 
 
 class Film(models.Model):
+    name = models.CharField(max_length=30)
     genre = models.CharField(
         max_length=2,
         help_text="Genre",
