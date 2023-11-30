@@ -1,4 +1,4 @@
-from .fields import DjangoConnectionField, DjangoListField
+from .fields import DjangoConnectionField, DjangoDataloadedListField, DjangoListField
 from .types import DjangoObjectType
 from .utils import bypass_get_queryset
 
@@ -8,6 +8,7 @@ __all__ = [
     "__version__",
     "DjangoObjectType",
     "DjangoListField",
+    "DjangoDataloadedListField",
     "DjangoConnectionField",
     "bypass_get_queryset",
 ]

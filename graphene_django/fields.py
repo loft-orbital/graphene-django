@@ -3,7 +3,7 @@ from functools import partial
 from typing import Any
 
 import django
-from django.db.models import IntegerField, Value
+from django.db.models import F, IntegerField, Value
 from django.db.models.query import QuerySet
 from graphql_relay import (
     cursor_to_offset,
@@ -33,7 +33,7 @@ class DjangoListField(Field):
         if isinstance(_type, NonNull):
             _type = _type.of_type
 
-        # Django would never return a Set of None  vvvvvvv
+        # Django would never return a Set of None
         super().__init__(List(NonNull(_type)), *args, **kwargs)
 
     @property
@@ -81,6 +81,114 @@ class DjangoListField(Field):
         django_object_type = _type.of_type.of_type
         return partial(
             self.list_resolver,
+            django_object_type,
+            resolver,
+            self.get_manager(),
+        )
+
+
+class DjangoDataloadedListField(Field):
+    def __init__(
+        self,
+        _type,
+        field,
+        *args,
+        **kwargs,
+    ):
+        from graphene_django.types import DjangoObjectType
+
+        if isinstance(_type, NonNull):
+            _type = _type.of_type
+
+        # Django would never return a Set of None
+        super().__init__(List(NonNull(_type)), *args, **kwargs)
+
+        assert issubclass(
+            self._underlying_type, DjangoObjectType
+        ), "DjangoListField only accepts DjangoObjectType types"
+
+        self._field = field
+
+    @property
+    def _underlying_type(self):
+        _type = self._type
+        while hasattr(_type, "of_type"):
+            _type = _type.of_type
+        return _type
+
+    @property
+    def model(self):
+        return self._underlying_type._meta.model
+
+    def get_manager(self):
+        return self.model._default_manager
+
+    @staticmethod
+    def list_resolver(
+        field, django_object_type, resolver, default_manager, root, info, **args
+    ):
+        related_name = root._meta.get_field(field).remote_field.name
+        many_to_many = root._meta.get_field(field).many_to_many
+
+        queryset = maybe_queryset(resolver(root, info, **args))
+        if queryset is None:
+            queryset = maybe_queryset(default_manager)
+
+        if isinstance(queryset, QuerySet):
+            # Pass queryset to the DjangoObjectType get_queryset method
+            queryset = maybe_queryset(django_object_type.get_queryset(queryset, info))
+
+        if info.context is not None and graphene_settings.USE_DATALOADERS:
+            try:
+                if not hasattr(info.context, "dataloaders"):
+                    info.context.dataloaders = {}
+            except AttributeError:
+                pass
+            else:
+                dataloader_key = get_info_cache_key(info)
+
+                if dataloader_key not in info.context.dataloaders:
+
+                    def load_many(keys):
+                        results_by_ids = defaultdict(list)
+                        if many_to_many:
+                            lookup = {
+                                f"{related_name}__in": keys,
+                            }
+                            annotation = {f"{related_name}_id": F(related_name)}
+                            qs = queryset.filter(**lookup).annotate(**annotation)
+                        else:
+                            lookup = {
+                                f"{related_name}_id__in": keys,
+                            }
+
+                            qs = queryset.filter(**lookup)
+
+                        for result in qs.iterator():
+                            results_by_ids[
+                                getattr(result, f"{related_name}_id")
+                            ].append(result)
+
+                        return [results_by_ids.get(id, []) for id in keys]
+
+                    info.context.dataloaders[dataloader_key] = SyncDataLoader(load_many)
+
+                return info.context.dataloaders[dataloader_key].load(root.id)
+
+        if many_to_many:
+            return queryset.filter(**{f"{related_name}": root.id})
+
+        return queryset.filter(**{f"{related_name}_id": root.id})
+
+    def wrap_resolve(self, parent_resolver):
+        resolver = super().wrap_resolve(parent_resolver)
+        _type = self.type
+        if isinstance(_type, NonNull):
+            _type = _type.of_type
+        django_object_type = _type.of_type.of_type
+        return partial(
+            self.list_resolver,
+            self._field,
             django_object_type,
             resolver,
             self.get_manager(),

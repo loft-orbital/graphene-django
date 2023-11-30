@@ -40,6 +40,7 @@ class Film(models.Model):
     class Meta:
         ordering = ["pk"]
 
+    name = models.CharField(max_length=30)
     genre = models.CharField(
         max_length=2,
         help_text="Genre",
