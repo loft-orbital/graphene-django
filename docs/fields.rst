@@ -92,8 +92,8 @@ By default it will resolve the default related queryset of the Django model, but
          model = Recipe
          fields = "__all__"
 
-      ingredients_dataloaded = DjangoDataloadedListField("ingredients")
-      ingredients_dataloaded_custom_resolver = DjangoDataloadedListField("ingredients")
+      ingredients_dataloaded = DjangoDataloadedListField(IngredientType, field="ingredients")
+      ingredients_dataloaded_custom_resolver = DjangoDataloadedListField(IngredientType, field="ingredients")
 
       def resolve_ingredients_dataloaded_custom_resolver(self, info):
          # Important: the queryset returned by the resolver must derivate

@@ -649,7 +649,7 @@ class TestDjangoListField:
             captured.captured_queries[1]["sql"],
         )
 
-    def test_django_dataloaded_list_field(
+    def test_django_one_to_many_dataloaded_list_field(
         self, execution_context_class, django_assert_max_num_queries
     ):
         class Context:
@@ -665,9 +665,9 @@ class TestDjangoListField:
                 model = ReporterModel
                 fields = ("first_name", "articles")
 
-            articles_dataloaded = DjangoDataloadedListField(Article)
+            articles_dataloaded = DjangoDataloadedListField(Article, field="articles")
             articles_dataloaded_with_custom_resolver = DjangoDataloadedListField(
-                Article
+                Article, field="articles"
             )
 
             def resolve_articles_dataloaded_with_custom_resolver(self, info):
@@ -831,5 +831,103 @@ class TestDjangoListField:
             )
             assert re.match(
                 r"SELECT .* FROM \"tests_article\" WHERE \(\"tests_article\".\"headline\" LIKE \'%Not%\' ESCAPE \'\\\' AND \"tests_article\".\"reporter_id\" = \d+\) .*",
+                captured.captured_queries[2]["sql"],
+            )
+
+    def test_django_many_to_many_dataloaded_list_field(
+        self, execution_context_class, django_assert_max_num_queries
+    ):
+        class Context:
+            pass
+
+        class Film(DjangoObjectType):
+            class Meta:
+                model = FilmModel
+                fields = ("name",)
+
+        class Reporter(DjangoObjectType):
+            class Meta:
+                model = ReporterModel
+                fields = ("first_name", "articles")
+
+            films_dataloaded = DjangoDataloadedListField(Film, field="films")
+
+        class Query(ObjectType):
+            reporters = DjangoListField(Reporter)
+
+        schema = Schema(query=Query)
+
+        r1 = ReporterModel.objects.create(first_name="Tara", last_name="West")
+        FilmModel.objects.create(name="Zoro").reporters.add(r1)
+        FilmModel.objects.create(name="Inception").reporters.add(r1)
+
+        r2 = ReporterModel.objects.create(first_name="Debra", last_name="Payne")
+        FilmModel.objects.create(name="Interstellar").reporters.add(r2)
+        FilmModel.objects.create(name="Cube").reporters.add(r2)
+
+        FilmModel.objects.create(name="Lost in translation").reporters.add(r1, r2)
+
+        query = """
+            query {
+                reporters {
+                    firstName
+                    filmsDataloaded {
+                        name
+                    }
+                }
+            }
+        """
+
+        with django_assert_max_num_queries(3) as captured:
+            result = schema.execute(
+                query,
+                execution_context_class=execution_context_class,
+                context_value=Context(),
+            )
+
+        assert not result.errors
+        assert result.data == {
+            "reporters": [
+                {
+                    "firstName": "Tara",
+                    "filmsDataloaded": [
+                        {"name": "Zoro"},
+                        {"name": "Inception"},
+                        {"name": "Lost in translation"},
+                    ],
+                },
+                {
+                    "firstName": "Debra",
+                    "filmsDataloaded": [
+                        {"name": "Interstellar"},
+                        {"name": "Cube"},
+                        {"name": "Lost in translation"},
+                    ],
+                },
+            ]
+        }
+
+        if execution_context_class == DeferredExecutionContext:
+            assert len(captured.captured_queries) == 2
+            assert re.match(
+                r'SELECT .* FROM "tests_reporter"',
+                captured.captured_queries[0]["sql"],
+            )
+            assert re.match(
+                r"SELECT .* FROM \"tests_film\" INNER JOIN \"tests_film_reporters\" ON \(\"tests_film\".\"id\" = \"tests_film_reporters\".\"film_id\"\) WHERE \"tests_film_reporters\".\"reporter_id\" IN \(\d+, \d+\)",
+                captured.captured_queries[1]["sql"],
+            )
+        else:
+            assert len(captured.captured_queries) == 3
+            assert re.match(
+                r'SELECT .* FROM "tests_reporter"',
+                captured.captured_queries[0]["sql"],
+            )
+            assert re.match(
+                r"SELECT .* FROM \"tests_film\" INNER JOIN \"tests_film_reporters\" ON \(\"tests_film\".\"id\" = \"tests_film_reporters\".\"film_id\"\) WHERE \"tests_film_reporters\".\"reporter_id\" = \d+",
+                captured.captured_queries[1]["sql"],
+            )
+            assert re.match(
+                r"SELECT .* FROM \"tests_film\" INNER JOIN \"tests_film_reporters\" ON \(\"tests_film\".\"id\" = \"tests_film_reporters\".\"film_id\"\) WHERE \"tests_film_reporters\".\"reporter_id\" = \d+",
                 captured.captured_queries[2]["sql"],
             )

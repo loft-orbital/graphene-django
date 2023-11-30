@@ -3,7 +3,7 @@ from functools import partial
 from typing import Any
 
 import django
-from django.db.models import IntegerField, Value
+from django.db.models import F, IntegerField, Value
 from django.db.models.query import QuerySet
 from graphql_relay import (
     cursor_to_offset,
@@ -88,8 +88,8 @@ class DjangoDataloadedListField(Field):
     def __init__(
         self,
         _type,
+        field,
         *args,
-        related_name=None,
         **kwargs,
     ):
         from graphene_django.types import DjangoObjectType
@@ -104,7 +104,7 @@ class DjangoDataloadedListField(Field):
             self._underlying_type, DjangoObjectType
         ), "DjangoListField only accepts DjangoObjectType types"
 
-        self._related_name = related_name
+        self._field = field
 
     @property
     def _underlying_type(self):
@@ -122,9 +122,11 @@ class DjangoDataloadedListField(Field):
 
     @staticmethod
     def list_resolver(
-        related_name, django_object_type, resolver, default_manager, root, info, **args
+        field, django_object_type, resolver, default_manager, root, info, **args
     ):
-        related_name = related_name or root._meta.db_table
+        related_name = root._meta.get_field(field).remote_field.name
+        many_to_many = root._meta.get_field(field).many_to_many
+
         queryset = maybe_queryset(resolver(root, info, **args))
         if queryset is None:
             queryset = maybe_queryset(default_manager)
@@ -146,11 +148,18 @@ class DjangoDataloadedListField(Field):
 
                     def load_many(keys):
                         results_by_ids = defaultdict(list)
-                        lookup = {
-                            f"{related_name}_id__in": keys,
-                        }
+                        if many_to_many:
+                            lookup = {
+                                f"{related_name}__in": keys,
+                            }
+                            annotation = {f"{related_name}_id": F(related_name)}
+                            qs = queryset.filter(**lookup).annotate(**annotation)
+                        else:
+                            lookup = {
+                                f"{related_name}_id__in": keys,
+                            }
 
-                        qs: QuerySet = queryset.filter(**lookup)
+                            qs = queryset.filter(**lookup)
 
                         for result in qs.iterator():
                             results_by_ids[
@@ -163,6 +172,9 @@ class DjangoDataloadedListField(Field):
 
                 return info.context.dataloaders[dataloader_key].load(root.id)
 
+        if many_to_many:
+            return queryset.filter(**{f"{related_name}": root.id})
+
         return queryset.filter(**{f"{related_name}_id": root.id})
 
     def wrap_resolve(self, parent_resolver):
@@ -173,7 +185,7 @@ class DjangoDataloadedListField(Field):
         django_object_type = _type.of_type.of_type
         return partial(
             self.list_resolver,
-            self._related_name,
+            self._field,
             django_object_type,
             resolver,
             self.get_manager(),
