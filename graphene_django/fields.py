@@ -124,7 +124,7 @@ class DjangoDataloadedListField(Field):
     def list_resolver(
         related_name, django_object_type, resolver, default_manager, root, info, **args
     ):
-        related_name = related_name or root._meta.model_name
+        related_name = related_name or root._meta.db_table
         queryset = maybe_queryset(resolver(root, info, **args))
         if queryset is None:
             queryset = maybe_queryset(default_manager)
