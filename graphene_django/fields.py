@@ -30,17 +30,11 @@ if GRAPHQL_SYNC_DATALOADERS_INSTALLED:
 
 class DjangoListField(Field):
     def __init__(self, _type, *args, **kwargs):
-        from .types import DjangoObjectType
-
         if isinstance(_type, NonNull):
             _type = _type.of_type
 
         # Django would never return a Set of None
         super().__init__(List(NonNull(_type)), *args, **kwargs)
-
-        assert issubclass(
-            self._underlying_type, DjangoObjectType
-        ), "DjangoListField only accepts DjangoObjectType types"
 
     @property
     def _underlying_type(self):
@@ -92,17 +86,11 @@ class DjangoDataloadedListField(Field):
         *args,
         **kwargs,
     ):
-        from graphene_django.types import DjangoObjectType
-
         if isinstance(_type, NonNull):
             _type = _type.of_type
 
         # Django would never return a Set of None
         super().__init__(List(NonNull(_type)), *args, **kwargs)
-
-        assert issubclass(
-            self._underlying_type, DjangoObjectType
-        ), "DjangoListField only accepts DjangoObjectType types"
 
         self._field = field
 

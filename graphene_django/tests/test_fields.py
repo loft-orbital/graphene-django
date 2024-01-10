@@ -1,11 +1,10 @@
 import datetime
 import re
 
-import pytest
 from django.db.models import Count, Prefetch
 from graphql_sync_dataloaders import DeferredExecutionContext
 
-from graphene import List, NonNull, ObjectType, Schema, String
+from graphene import List, NonNull, ObjectType, Schema
 
 from ..fields import DjangoDataloadedListField, DjangoListField
 from ..types import DjangoObjectType
@@ -13,18 +12,12 @@ from .models import (
     Article as ArticleModel,
     Film as FilmModel,
     FilmDetails as FilmDetailsModel,
+    Person as PersonModel,
     Reporter as ReporterModel,
 )
 
 
 class TestDjangoListField:
-    def test_only_django_object_types(self):
-        class TestType(ObjectType):
-            foo = String()
-
-        with pytest.raises(AssertionError):
-            DjangoListField(TestType)
-
     def test_only_import_paths(self):
         list_field = DjangoListField("graphene_django.tests.schema.Human")
         from .schema import Human
@@ -260,6 +253,69 @@ class TestDjangoListField:
             "reporters": [
                 {"firstName": "Tara", "articles": [{"headline": "Amazing news"}]},
                 {"firstName": "Debra", "articles": []},
+            ]
+        }
+
+    def test_same_type_nested_list_field(self):
+        class Person(DjangoObjectType):
+            class Meta:
+                model = PersonModel
+                fields = ("name", "parent")
+
+            children = DjangoListField(lambda: Person)
+
+        class Query(ObjectType):
+            persons = DjangoListField(Person)
+
+        schema = Schema(query=Query)
+
+        query = """
+            query {
+                persons {
+                    name
+                    children {
+                        name
+                    }
+                }
+            }
+        """
+
+        p1 = PersonModel.objects.create(name="Tara")
+        PersonModel.objects.create(name="Debra")
+
+        PersonModel.objects.create(
+            name="Toto",
+            parent=p1,
+        )
+        PersonModel.objects.create(
+            name="Tata",
+            parent=p1,
+        )
+
+        result = schema.execute(query)
+
+        assert not result.errors
+        assert result.data == {
+            "persons": [
+                {
+                    "name": "Tara",
+                    "children": [
+                        {"name": "Toto"},
+                        {"name": "Tata"},
+                    ],
+                },
+                {
+                    "name": "Debra",
+                    "children": [],
+                },
+                {
+                    "name": "Toto",
+                    "children": [],
+                },
+                {
+                    "name": "Tata",
+                    "children": [],
+                },
             ]
         }
 
