@@ -95,19 +95,22 @@ class DjangoDataloadedListField(Field):
         *args,
         **kwargs,
     ):
-        from graphene_django.types import DjangoObjectType
-
         if isinstance(_type, NonNull):
             _type = _type.of_type
 
         # Django would never return a Set of None
         super().__init__(List(NonNull(_type)), *args, **kwargs)
 
+        self._field = field
+
+    @property
+    def type(self):
+        from .types import DjangoObjectType
+
         assert issubclass(
             self._underlying_type, DjangoObjectType
-        ), "DjangoListField only accepts DjangoObjectType types"
-
-        self._field = field
+        ), "DjangoDataloadedListField only accepts DjangoObjectType types as underlying type"
+        return super().type
 
     @property
     def _underlying_type(self):
