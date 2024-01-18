@@ -37,6 +37,15 @@ class DjangoListField(Field):
         super().__init__(List(NonNull(_type)), *args, **kwargs)
 
     @property
+    def type(self):
+        from .types import DjangoObjectType
+
+        assert issubclass(
+            self._underlying_type, DjangoObjectType
+        ), "DjangoListField only accepts DjangoObjectType types as underlying type"
+        return super().type
+
+    @property
     def _underlying_type(self):
         _type = self._type
         while hasattr(_type, "of_type"):
@@ -93,6 +102,15 @@ class DjangoDataloadedListField(Field):
         super().__init__(List(NonNull(_type)), *args, **kwargs)
 
         self._field = field
+
+    @property
+    def type(self):
+        from .types import DjangoObjectType
+
+        assert issubclass(
+            self._underlying_type, DjangoObjectType
+        ), "DjangoDataloadedListField only accepts DjangoObjectType types as underlying type"
+        return super().type
 
     @property
     def _underlying_type(self):

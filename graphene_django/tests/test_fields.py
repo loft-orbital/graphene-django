@@ -1,10 +1,11 @@
 import datetime
 import re
 
+import pytest
 from django.db.models import Count, Prefetch
 from graphql_sync_dataloaders import DeferredExecutionContext
 
-from graphene import List, NonNull, ObjectType, Schema
+from graphene import List, NonNull, ObjectType, Schema, String
 
 from ..fields import DjangoDataloadedListField, DjangoListField
 from ..types import DjangoObjectType
@@ -18,6 +19,13 @@ from .models import (
 
 
 class TestDjangoListField:
+    def test_only_django_object_types(self):
+        class Query(ObjectType):
+            something = DjangoListField(String)
+
+        with pytest.raises(TypeError):
+            Schema(query=Query)
+
     def test_only_import_paths(self):
         list_field = DjangoListField("graphene_django.tests.schema.Human")
         from .schema import Human
