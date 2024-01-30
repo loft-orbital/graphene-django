@@ -1,10 +1,12 @@
+from collections import defaultdict
 from functools import partial
+from typing import Any
 
+import django
+from django.db.models import F, IntegerField, Value
 from django.db.models.query import QuerySet
 from graphql_relay import (
-    connection_from_array_slice,
     cursor_to_offset,
-    get_offset_with_default,
     offset_to_cursor,
 )
 from promise import Promise
@@ -14,8 +16,16 @@ from graphene.relay import ConnectionField
 from graphene.relay.connection import connection_adapter, page_info_adapter
 from graphene.types import Field, List
 
+from .relay import connection_from_sized_sliceable
 from .settings import graphene_settings
-from .utils import maybe_queryset
+from .utils import (
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED,
+    get_info_cache_key,
+    maybe_queryset,
+)
+
+if GRAPHQL_SYNC_DATALOADERS_INSTALLED:
+    from graphql_sync_dataloaders import SyncDataLoader, SyncFuture
 
 
 class DjangoListField(Field):
@@ -23,7 +33,7 @@ class DjangoListField(Field):
         if isinstance(_type, NonNull):
             _type = _type.of_type
 
-        # Django would never return a Set of None  vvvvvvv
+        # Django would never return a Set of None
         super().__init__(List(NonNull(_type)), *args, **kwargs)
 
     @property
@@ -71,6 +81,117 @@ class DjangoListField(Field):
         django_object_type = _type.of_type.of_type
         return partial(
             self.list_resolver,
+            django_object_type,
+            resolver,
+            self.get_manager(),
+        )
+
+
+class DjangoDataloadedListField(Field):
+    def __init__(
+        self,
+        _type,
+        field,
+        *args,
+        **kwargs,
+    ):
+        if isinstance(_type, NonNull):
+            _type = _type.of_type
+
+        # Django would never return a Set of None
+        super().__init__(List(NonNull(_type)), *args, **kwargs)
+
+        self._field = field
+
+    @property
+    def type(self):
+        from .types import DjangoObjectType
+
+        assert issubclass(
+            self._underlying_type, DjangoObjectType
+        ), "DjangoDataloadedListField only accepts DjangoObjectType types as underlying type"
+        return super().type
+
+    @property
+    def _underlying_type(self):
+        _type = self._type
+        while hasattr(_type, "of_type"):
+            _type = _type.of_type
+        return _type
+
+    @property
+    def model(self):
+        return self._underlying_type._meta.model
+
+    def get_manager(self):
+        return self.model._default_manager
+
+    @staticmethod
+    def list_resolver(
+        field, django_object_type, resolver, default_manager, root, info, **args
+    ):
+        related_name = root._meta.get_field(field).remote_field.name
+        many_to_many = root._meta.get_field(field).many_to_many
+
+        queryset = maybe_queryset(resolver(root, info, **args))
+        if queryset is None:
+            queryset = maybe_queryset(default_manager)
+
+        if isinstance(queryset, QuerySet):
+            # Pass queryset to the DjangoObjectType get_queryset method
+            queryset = maybe_queryset(django_object_type.get_queryset(queryset, info))
+
+        if info.context is not None and graphene_settings.USE_DATALOADERS:
+            try:
+                if not hasattr(info.context, "dataloaders"):
+                    info.context.dataloaders = {}
+            except AttributeError:
+                pass
+            else:
+                dataloader_key = get_info_cache_key(info)
+
+                if dataloader_key not in info.context.dataloaders:
+
+                    def load_many(keys):
+                        results_by_ids = defaultdict(list)
+                        if many_to_many:
+                            lookup = {
+                                f"{related_name}__in": keys,
+                            }
+                            annotation = {f"{related_name}_id": F(related_name)}
+                            qs = queryset.filter(**lookup).annotate(**annotation)
+                        else:
+                            lookup = {
+                                f"{related_name}_id__in": keys,
+                            }
+
+                            qs = queryset.filter(**lookup)
+
+                        for result in qs.iterator():
+                            results_by_ids[
+                                getattr(result, f"{related_name}_id")
+                            ].append(result)
+
+                        return [results_by_ids.get(id, []) for id in keys]
+
+                    info.context.dataloaders[dataloader_key] = SyncDataLoader(load_many)
+
+                return info.context.dataloaders[dataloader_key].load(root.id)
+
+        if many_to_many:
+            return queryset.filter(**{f"{related_name}": root.id})
+
+        return queryset.filter(**{f"{related_name}_id": root.id})
+
+    def wrap_resolve(self, parent_resolver):
+        resolver = super().wrap_resolve(parent_resolver)
+        _type = self.type
+        if isinstance(_type, NonNull):
+            _type = _type.of_type
+        django_object_type = _type.of_type.of_type
+        return partial(
+            self.list_resolver,
+            self._field,
             django_object_type,
             resolver,
             self.get_manager(),
@@ -143,7 +264,7 @@ class DjangoConnectionField(ConnectionField):
         return connection._meta.node.get_queryset(queryset, info)
 
     @classmethod
-    def resolve_connection(cls, connection, args, iterable, max_limit=None):
+    def resolve_connection(cls, connection, args, iterable, info, max_limit=None):
         # Remove the offset parameter and convert it to an after cursor.
         offset = args.pop("offset", None)
         after = args.get("after")
@@ -155,20 +276,6 @@ class DjangoConnectionField(ConnectionField):
 
         iterable = maybe_queryset(iterable)
 
-        if isinstance(iterable, QuerySet):
-            array_length = iterable.count()
-        else:
-            array_length = len(iterable)
-
-        # If after is higher than array_length, connection_from_array_slice
-        # would try to do a negative slicing which makes django throw an
-        # AssertionError
-        slice_start = min(
-            get_offset_with_default(args.get("after"), -1) + 1,
-            array_length,
-        )
-        array_slice_length = array_length - slice_start
-
         # Impose the maximum limit via the `first` field if neither first or last are already provided
         # (note that if any of them is provided they must be under max_limit otherwise an error is raised).
         if (
@@ -178,19 +285,70 @@ class DjangoConnectionField(ConnectionField):
         ):
             args["first"] = max_limit
 
-        connection = connection_from_array_slice(
-            iterable[slice_start:],
-            args,
-            slice_start=slice_start,
-            array_length=array_length,
-            array_slice_length=array_slice_length,
+        if (
+            django.VERSION[0] >= 3
+            and info.context is not None
+            and graphene_settings.USE_DATALOADERS
+        ):
+            try:
+                if not hasattr(info.context, "dataloaders"):
+                    info.context.dataloaders = {}
+            except AttributeError:
+                pass
+            else:
+                dataloader_key = get_info_cache_key(info)
+
+                if dataloader_key not in info.context.dataloaders:
+
+                    def load_many(keys):
+                        # `keys` is a list of tuples of (queryset, start, stop)
+
+                        # We begin with an empty queryset, so we can union it with the others
+                        first_queryset, _, _ = keys[0]
+                        qs = first_queryset.model.objects.none()
+
+                        objects = qs.union(
+                            *(
+                                queryset.annotate(
+                                    _dataloader_queryset_index=Value(
+                                        index,
+                                        output_field=IntegerField(),
+                                    ),
+                                )[start:stop]
+                                for index, (queryset, start, stop) in enumerate(keys)
+                            ),
+                            all=True,
+                        )
+
+                        object_map: dict[str, Any] = defaultdict(list)
+
+                        for object_ in objects:
+                            object_map[object_._dataloader_queryset_index].append(
+                                object_
+                            )
+
+                        return [object_map.get(index, []) for index in range(len(keys))]
+
+                    info.context.dataloaders[dataloader_key] = SyncDataLoader(load_many)
+
+        connection = connection_from_sized_sliceable(
+            sized_sliceable=iterable,
+            args=args,
+            info=info,
             connection_type=partial(connection_adapter, connection),
             edge_type=connection.Edge,
             page_info_type=page_info_adapter,
         )
-        connection.iterable = iterable
-        connection.length = array_length
-        return connection
+
+        def compute_connection(connection):
+            connection.iterable = iterable
+            connection.length = len(connection.edges)
+            return connection
+
+        if GRAPHQL_SYNC_DATALOADERS_INSTALLED and isinstance(connection, SyncFuture):
+            return connection.then(compute_connection)
+
+        return compute_connection(connection)
 
     @classmethod
     def connection_resolver(
@@ -242,7 +400,7 @@ class DjangoConnectionField(ConnectionField):
         # but iterable might be promise
         iterable = queryset_resolver(connection, iterable, info, args)
         on_resolve = partial(
-            cls.resolve_connection, connection, args, max_limit=max_limit
+            cls.resolve_connection, connection, args, info=info, max_limit=max_limit
         )
 
         if Promise.is_thenable(iterable):

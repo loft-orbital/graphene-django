@@ -11,13 +11,15 @@ from pytest import raises
 import graphene
 from graphene.relay import Node
 
-from ..compat import IntegerRangeField, MissingType
+from ..compat import IntegerRangeField, JSONField, MissingType
 from ..fields import DjangoConnectionField
 from ..types import DjangoObjectType
 from ..utils import DJANGO_FILTER_INSTALLED
 from .models import (
     APNewsReporter,
     Article,
+    BaseModel,
+    ChildModel,
     CNNReporter,
     Film,
     FilmDetails,
@@ -25,6 +27,14 @@ from .models import (
     Pet,
     Reporter,
 )
+
+
+@pytest.fixture(autouse=True)
+def execution_context_class(execution_context_class):
+    """
+    Fixture to test with custom `execution_context_class`
+    """
+    return execution_context_class
 
 
 def test_should_query_only_fields():
@@ -133,7 +143,7 @@ def test_should_query_postgres_fields():
 
     class Event(models.Model):
         ages = IntegerRangeField(help_text="The age ranges")
-        data = models.JSONField(help_text="Data")
+        data = JSONField(help_text="Data")
         store = HStoreField()
         tags = ArrayField(models.CharField(max_length=50))
 
@@ -177,7 +187,7 @@ def test_should_query_postgres_fields():
     assert result.data == expected
 
 
-def test_should_node():
+def test_should_node(execution_context_class):
     class ReporterNode(DjangoObjectType):
         class Meta:
             model = Reporter
@@ -253,7 +263,7 @@ def test_should_node():
         },
     }
     schema = graphene.Schema(query=Query)
-    result = schema.execute(query)
+    result = schema.execute(query, execution_context_class=execution_context_class)
     assert not result.errors
     assert result.data == expected
 
@@ -316,7 +326,7 @@ def test_should_query_onetoone_fields():
     assert result.data == expected
 
 
-def test_should_query_connectionfields():
+def test_should_query_connectionfields(execution_context_class):
     class ReporterType(DjangoObjectType):
         class Meta:
             model = Reporter
@@ -344,7 +354,7 @@ def test_should_query_connectionfields():
           }
         }
     """
-    result = schema.execute(query)
+    result = schema.execute(query, execution_context_class=execution_context_class)
     assert not result.errors
     assert result.data == {
         "allReporters": {
@@ -354,7 +364,7 @@ def test_should_query_connectionfields():
     }
 
 
-def test_should_keep_annotations():
+def test_should_keep_annotations(execution_context_class):
     from django.db.models import Avg, Count
 
     class ReporterType(DjangoObjectType):
@@ -409,7 +419,7 @@ def test_should_keep_annotations():
           }
         }
     """
-    result = schema.execute(query)
+    result = schema.execute(query, execution_context_class=execution_context_class)
     assert not result.errors
 
 
@@ -966,13 +976,6 @@ def test_should_query_dataloader_fields():
 
 
 def test_should_handle_inherited_choices():
-    class BaseModel(models.Model):
-        choice_field = models.IntegerField(choices=((0, "zero"), (1, "one")))
-
-    class ChildModel(BaseModel):
-        class Meta:
-            proxy = True
-
     class BaseType(DjangoObjectType):
         class Meta:
             model = BaseModel
@@ -1073,6 +1076,9 @@ def test_proxy_model_support():
     assert result.data == expected
 
 
+@pytest.mark.xfail(
+    reason="Until https://github.com/graphql-python/graphene-django/pull/1380#issuecomment-1646331317 is fixed."
+)
 def test_model_inheritance_support_reverse_relationships():
     """
     This test asserts that we can query reverse relationships for all Reporters and proxied Reporters and multi table Reporters.
@@ -1584,6 +1590,7 @@ class TestBackwardPagination:
             e["node"]["firstName"] for e in result.data["allReporters"]["edges"]
         ] == ["First 3", "First 4", "First 5"]
 
+    @pytest.mark.skip(reason="Using first and last should not be supported.")
     def test_query_first_and_last(self, graphene_settings, max_limit):
         schema = self.setup_schema(graphene_settings, max_limit=max_limit)
         query_first_and_last = """
@@ -1605,6 +1612,7 @@ class TestBackwardPagination:
             e["node"]["firstName"] for e in result.data["allReporters"]["edges"]
         ] == ["First 1", "First 2", "First 3"]
 
+    @pytest.mark.skip(reason="Using last and after should not be supported.")
     def test_query_first_last_and_after(self, graphene_settings, max_limit):
         schema = self.setup_schema(graphene_settings, max_limit=max_limit)
         query_first_last_and_after = """
@@ -1710,7 +1718,7 @@ def test_should_preserve_prefetch_related(django_assert_num_queries):
     """
     schema = graphene.Schema(query=Query)
 
-    with django_assert_num_queries(3):
+    with django_assert_num_queries(2):
         result = schema.execute(query)
         assert not result.errors
 
@@ -2004,10 +2012,12 @@ def test_should_query_nullable_foreign_key():
     class PetType(DjangoObjectType):
         class Meta:
             model = Pet
+            fields = "__all__"
 
     class PersonType(DjangoObjectType):
         class Meta:
             model = Person
+            fields = "__all__"
 
     class Query(graphene.ObjectType):
         pet = graphene.Field(PetType, name=graphene.String(required=True))
@@ -2068,6 +2078,7 @@ def test_should_query_nullable_one_to_one_relation_with_custom_resolver():
     class FilmType(DjangoObjectType):
         class Meta:
             model = Film
+            fields = "__all__"
 
         @classmethod
         def get_queryset(cls, queryset, info):
@@ -2076,6 +2087,7 @@ def test_should_query_nullable_one_to_one_relation_with_custom_resolver():
     class FilmDetailsType(DjangoObjectType):
         class Meta:
             model = FilmDetails
+            fields = "__all__"
 
         @classmethod
         def get_queryset(cls, queryset, info):

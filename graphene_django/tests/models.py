@@ -40,6 +40,7 @@ class Film(models.Model):
     class Meta:
         ordering = ["pk"]
 
+    name = models.CharField(max_length=30)
     genre = models.CharField(
         max_length=2,
         help_text="Genre",
@@ -148,3 +149,12 @@ class Article(models.Model):
 
     class Meta:
         ordering = ("headline",)
+
+
+class BaseModel(models.Model):
+    choice_field = models.IntegerField(choices=((0, "zero"), (1, "one")))
+
+
+class ChildModel(BaseModel):
+    class Meta:
+        proxy = True
