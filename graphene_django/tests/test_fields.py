@@ -1002,6 +1002,7 @@ class TestDjangoListField:
                 captured.captured_queries[2]["sql"],
             )
 
+
 class TestDjangoConnectionField:
     def test_model_ordering_assertion(self):
         class Chaos(Model):
