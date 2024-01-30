@@ -2,12 +2,13 @@ import datetime
 import re
 
 import pytest
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Model, Prefetch
 from graphql_sync_dataloaders import DeferredExecutionContext
 
 from graphene import List, NonNull, ObjectType, Schema, String
+from graphene.relay import Node
 
-from ..fields import DjangoDataloadedListField, DjangoListField
+from ..fields import DjangoConnectionField, DjangoDataloadedListField, DjangoListField
 from ..types import DjangoObjectType
 from .models import (
     Article as ArticleModel,
@@ -23,8 +24,13 @@ class TestDjangoListField:
         class Query(ObjectType):
             something = DjangoListField(String)
 
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError) as excinfo:
             Schema(query=Query)
+
+        assert (
+            "Query fields cannot be resolved. DjangoListField only accepts DjangoObjectType types as underlying type"
+            in str(excinfo.value)
+        )
 
     def test_only_import_paths(self):
         list_field = DjangoListField("graphene_django.tests.schema.Human")
@@ -995,3 +1001,34 @@ class TestDjangoListField:
                 r"SELECT .* FROM \"tests_film\" INNER JOIN \"tests_film_reporters\" ON \(\"tests_film\".\"id\" = \"tests_film_reporters\".\"film_id\"\) WHERE \"tests_film_reporters\".\"reporter_id\" = \d+",
                 captured.captured_queries[2]["sql"],
             )
+
+
+class TestDjangoConnectionField:
+    def test_model_ordering_assertion(self):
+        class Chaos(Model):
+            class Meta:
+                app_label = "test"
+
+        class ChaosType(DjangoObjectType):
+            class Meta:
+                model = Chaos
+                interfaces = (Node,)
+
+        class Query(ObjectType):
+            chaos = DjangoConnectionField(ChaosType)
+
+        with pytest.raises(
+            TypeError,
+            match=r"Django model test\.Chaos has to have a default ordering to be used in a Connection\.",
+        ):
+            Schema(query=Query)
+
+    def test_only_django_object_types(self):
+        class Query(ObjectType):
+            something = DjangoConnectionField(String)
+
+        with pytest.raises(
+            TypeError,
+            match="DjangoConnectionField only accepts DjangoObjectType types as underlying type",
+        ):
+            Schema(query=Query)
