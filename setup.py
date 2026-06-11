@@ -60,9 +60,9 @@ setup(
     packages=find_packages(exclude=["tests", "examples", "examples.*"]),
     install_requires=[
         "graphene @ git+https://github.com/graphql-python/graphene.git@ee1ff975d71f6590eb6933d76d12054c9839774a#egg=graphene",
-        "graphql-core>=3.1.0,<4",
+        "graphql-core>=3.2.10,<4",
         "graphql-relay>=3.1.1,<4",
-        "graphql-sync-dataloaders @ git+https://github.com/loft-orbital/graphql-sync-dataloaders.git@loft-1.0.1#egg=graphql-sync-dataloaders",
+        "graphql-sync-dataloaders @ git+https://github.com/loft-orbital/graphql-sync-dataloaders.git@loft-1.0.2#egg=graphql-sync-dataloaders",
         "Django>=2.2.13",
         "promise>=2.1",
         "text-unidecode",
