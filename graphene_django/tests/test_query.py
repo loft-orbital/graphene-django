@@ -29,6 +29,22 @@ from .models import (
     Reporter,
 )
 
+if IntegerRangeField is not MissingType:
+    from django.contrib.postgres.fields import ArrayField, HStoreField
+
+    # Defined at module level so the model is only registered once, even though the
+    # dataloaders parametrization runs each test of this module twice in the same
+    # process. Unmanaged so the test database setup doesn't try to create a table
+    # with postgres-only column types on sqlite.
+    class Event(models.Model):
+        ages = IntegerRangeField(help_text="The age ranges")
+        data = JSONField(help_text="Data")
+        store = HStoreField()
+        tags = ArrayField(models.CharField(max_length=50))
+
+        class Meta:
+            managed = False
+
 
 @pytest.fixture(autouse=True)
 def execution_context_class(execution_context_class):
@@ -136,18 +152,6 @@ def test_should_query_well():
 
 @pytest.mark.skipif(IntegerRangeField is MissingType, reason="RangeField should exist")
 def test_should_query_postgres_fields():
-    from django.contrib.postgres.fields import (
-        ArrayField,
-        HStoreField,
-        IntegerRangeField,
-    )
-
-    class Event(models.Model):
-        ages = IntegerRangeField(help_text="The age ranges")
-        data = JSONField(help_text="Data")
-        store = HStoreField()
-        tags = ArrayField(models.CharField(max_length=50))
-
     class EventType(DjangoObjectType):
         class Meta:
             model = Event

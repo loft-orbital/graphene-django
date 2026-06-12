@@ -20,7 +20,7 @@ tests_require = [
     "coveralls",
     "mock",
     "pytz",
-    "django-filter>=21.1",
+    "django-filter>=22.1",
     "pytest-django>=4.5.2",
 ] + rest_framework_require
 
@@ -45,8 +45,6 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Libraries",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
@@ -65,7 +63,7 @@ setup(
         "graphql-core>=3.1.0,<4",
         "graphql-relay>=3.1.1,<4",
         "graphql-sync-dataloaders @ git+https://github.com/loft-orbital/graphql-sync-dataloaders.git@loft-1.0.1#egg=graphql-sync-dataloaders",
-        "Django>=2.2.13",
+        "Django>=3.2,<6",
         "promise>=2.1",
         "text-unidecode",
     ],
