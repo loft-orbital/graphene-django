@@ -180,3 +180,12 @@ class Article(models.Model):
 
     class Meta:
         ordering = ("headline",)
+
+
+class BaseModel(models.Model):
+    choice_field = models.IntegerField(choices=((0, "zero"), (1, "one")))
+
+
+class ChildModel(BaseModel):
+    class Meta:
+        proxy = True

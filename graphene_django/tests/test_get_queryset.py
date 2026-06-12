@@ -8,6 +8,14 @@ from ..types import DjangoObjectType
 from .models import Article, Film, FilmDetails, Reporter
 
 
+@pytest.fixture(autouse=True)
+def execution_context_class(execution_context_class):
+    """
+    Fixture to test with custom `execution_context_class`
+    """
+    return execution_context_class
+
+
 class TestShouldCallGetQuerySetOnForeignKey:
     """
     Check that the get_queryset method is called in both forward and reversed direction
@@ -204,6 +212,7 @@ class TestShouldCallGetQuerySetOnForeignKeyNode:
                 model = Reporter
                 fields = "__all__"
                 interfaces = (Node,)
+                fields = "__all__"
 
             @classmethod
             def get_queryset(cls, queryset, info):
@@ -216,6 +225,7 @@ class TestShouldCallGetQuerySetOnForeignKeyNode:
                 model = Article
                 fields = "__all__"
                 interfaces = (Node,)
+                fields = "__all__"
 
             @classmethod
             def get_queryset(cls, queryset, info):

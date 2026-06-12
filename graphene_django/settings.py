@@ -46,6 +46,7 @@ DEFAULTS = {
     "ATOMIC_MUTATIONS": False,
     "TESTING_ENDPOINT": "/graphql",
     "MAX_VALIDATION_ERRORS": None,
+    "USE_DATALOADERS": False,
 }
 
 if settings.DEBUG:

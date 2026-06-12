@@ -2,11 +2,12 @@ import datetime
 import re
 
 import pytest
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Model, Prefetch
+from graphql_sync_dataloaders import DeferredExecutionContext
 
 from graphene import List, NonNull, ObjectType, Schema, String
 
-from ..fields import DjangoListField
+from ..fields import DjangoConnectionField, DjangoDataloadedListField, DjangoListField
 from ..types import DjangoObjectType
 from .models import (
     Article as ArticleModel,

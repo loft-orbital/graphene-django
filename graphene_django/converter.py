@@ -488,7 +488,7 @@ def convert_postgres_array_to_list(field, registry=None):
 
 
 @convert_django_field.register(HStoreField)
-@convert_django_field.register(models.JSONField)
+@convert_django_field.register(JSONField)
 def convert_json_field_to_string(field, registry=None):
     return JSONString(
         description=get_django_field_description(field), required=not field.null

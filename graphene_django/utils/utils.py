@@ -15,6 +15,13 @@ try:
 except ImportError:
     DJANGO_FILTER_INSTALLED = False
 
+try:
+    import graphql_sync_dataloaders  # noqa
+
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED = True
+except ImportError:
+    GRAPHQL_SYNC_DATALOADERS_INSTALLED = False
+
 
 def isiterable(value):
     try:
@@ -48,24 +55,17 @@ def _get_model_ancestry(model):
 
 
 def get_reverse_fields(model, local_field_names):
-    """
-    Searches through the model's ancestry and gets reverse relationships the models
-    Yields a tuple of (field.name, field)
-    """
-    model_ancestry = _get_model_ancestry(model)
+    for name, attr in model.__dict__.items():
+        # Don't duplicate any local fields
+        if name in local_field_names:
+            continue
 
-    for _model in model_ancestry:
-        for name, attr in _model.__dict__.items():
-            # Don't duplicate any local fields
-            if name in local_field_names:
-                continue
-
-            # "rel" for FK and M2M relations and "related" for O2O Relations
-            related = getattr(attr, "rel", None) or getattr(attr, "related", None)
-            if isinstance(related, models.ManyToOneRel):
-                yield (name, related)
-            elif isinstance(related, models.ManyToManyRel) and not related.symmetrical:
-                yield (name, related)
+        # "rel" for FK and M2M relations and "related" for O2O Relations
+        related = getattr(attr, "rel", None) or getattr(attr, "related", None)
+        if isinstance(related, models.ManyToOneRel):
+            yield (name, related)
+        elif isinstance(related, models.ManyToManyRel) and not related.symmetrical:
+            yield (name, related)
 
 
 def get_local_fields(model):
@@ -129,6 +129,18 @@ def bypass_get_queryset(resolver):
     """
     resolver._bypass_get_queryset = True
     return resolver
+
+
+def get_info_cache_key(info):
+    """
+    From https://github.com/graphql-python/graphql-core/blob/0c93b8452eed38d4f800c7e71cf6f3f3758cd1c6/src/graphql/execution/execute.py#L1612C9-L1616C10
+    """
+
+    return (
+        (info.return_type, id(info.field_nodes[0]))
+        if len(info.field_nodes) == 1  # optimize most frequent case
+        else (info.return_type, *map(id, info.field_nodes))
+    )
 
 
 _DJANGO_VERSION_AT_LEAST_4_2 = django.VERSION[0] > 4 or (
