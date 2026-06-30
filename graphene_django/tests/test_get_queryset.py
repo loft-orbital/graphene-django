@@ -210,6 +210,7 @@ class TestShouldCallGetQuerySetOnForeignKeyNode:
         class ReporterType(DjangoObjectType):
             class Meta:
                 model = Reporter
+                fields = "__all__"
                 interfaces = (Node,)
                 fields = "__all__"
 
@@ -222,6 +223,7 @@ class TestShouldCallGetQuerySetOnForeignKeyNode:
         class ArticleType(DjangoObjectType):
             class Meta:
                 model = Article
+                fields = "__all__"
                 interfaces = (Node,)
                 fields = "__all__"
 

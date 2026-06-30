@@ -1,13 +1,39 @@
+import django
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 CHOICES = ((1, "this"), (2, _("that")))
 
 
-class Person(models.Model):
-    class Meta:
-        ordering = ["pk"]
+def get_choices_as_class(choices_class):
+    if django.VERSION >= (5, 0):
+        return choices_class
+    else:
+        return choices_class.choices
 
+
+def get_choices_as_callable(choices_class):
+    if django.VERSION >= (5, 0):
+
+        def choices():
+            return choices_class.choices
+
+        return choices
+    else:
+        return choices_class.choices
+
+
+class TypedIntChoice(models.IntegerChoices):
+    CHOICE_THIS = 1
+    CHOICE_THAT = 2
+
+
+class TypedStrChoice(models.TextChoices):
+    CHOICE_THIS = "this"
+    CHOICE_THAT = "that"
+
+
+class Person(models.Model):
     name = models.CharField(max_length=30)
     parent = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="children"
@@ -15,9 +41,6 @@ class Person(models.Model):
 
 
 class Pet(models.Model):
-    class Meta:
-        ordering = ["pk"]
-
     name = models.CharField(max_length=30)
     age = models.PositiveIntegerField()
     owner = models.ForeignKey(
@@ -37,9 +60,6 @@ class FilmDetails(models.Model):
 
 
 class Film(models.Model):
-    class Meta:
-        ordering = ["pk"]
-
     name = models.CharField(max_length=30)
     genre = models.CharField(
         max_length=2,
@@ -56,14 +76,26 @@ class DoeReporterManager(models.Manager):
 
 
 class Reporter(models.Model):
-    class Meta:
-        ordering = ["pk"]
-
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     email = models.EmailField()
     pets = models.ManyToManyField("self")
     a_choice = models.IntegerField(choices=CHOICES, null=True, blank=True)
+    typed_choice = models.IntegerField(
+        choices=TypedIntChoice.choices,
+        null=True,
+        blank=True,
+    )
+    class_choice = models.IntegerField(
+        choices=get_choices_as_class(TypedIntChoice),
+        null=True,
+        blank=True,
+    )
+    callable_choice = models.IntegerField(
+        choices=get_choices_as_callable(TypedStrChoice),
+        null=True,
+        blank=True,
+    )
     objects = models.Manager()
     doe_objects = DoeReporterManager()
     fans = models.ManyToManyField(Person)

@@ -1,5 +1,4 @@
 import inspect
-from collections import OrderedDict
 from functools import partial, singledispatch, wraps
 
 from django.db import models
@@ -37,7 +36,7 @@ except ImportError:
     from graphql import assert_valid_name as assert_name
 from graphql.pyutils import register_description
 
-from .compat import ArrayField, HStoreField, JSONField, RangeField
+from .compat import ArrayField, HStoreField, RangeField, normalize_choices
 from .fields import DjangoConnectionField, DjangoListField
 from .settings import graphene_settings
 from .utils.str_converters import to_const
@@ -61,6 +60,24 @@ class BlankValueField(Field):
         return blank_field_wrapper(resolver)
 
 
+class EnumValueField(BlankValueField):
+    def wrap_resolve(self, parent_resolver):
+        resolver = super().wrap_resolve(parent_resolver)
+
+        # create custom resolver
+        def enum_field_wrapper(func):
+            @wraps(func)
+            def wrapped_resolver(*args, **kwargs):
+                return_value = func(*args, **kwargs)
+                if isinstance(return_value, models.Choices):
+                    return_value = return_value.value
+                return return_value
+
+            return wrapped_resolver
+
+        return enum_field_wrapper(resolver)
+
+
 def convert_choice_name(name):
     name = to_const(force_str(name))
     try:
@@ -72,8 +89,7 @@ def convert_choice_name(name):
 
 def get_choices(choices):
     converted_names = []
-    if isinstance(choices, OrderedDict):
-        choices = choices.items()
+    choices = normalize_choices(choices)
     for value, help_text in choices:
         if isinstance(help_text, (tuple, list)):
             yield from get_choices(help_text)
@@ -150,7 +166,7 @@ def convert_django_field_with_choices(
 
         converted = EnumCls(
             description=get_django_field_description(field), required=required
-        ).mount_as(BlankValueField)
+        ).mount_as(EnumValueField)
     else:
         converted = convert_django_field(field, registry)
     if registry is not None:
@@ -183,17 +199,11 @@ def convert_field_to_string(field, registry=None):
     )
 
 
-@convert_django_field.register(models.BigAutoField)
 @convert_django_field.register(models.AutoField)
+@convert_django_field.register(models.BigAutoField)
+@convert_django_field.register(models.SmallAutoField)
 def convert_field_to_id(field, registry=None):
     return ID(description=get_django_field_description(field), required=not field.null)
-
-
-if hasattr(models, "SmallAutoField"):
-
-    @convert_django_field.register(models.SmallAutoField)
-    def convert_field_small_to_id(field, registry=None):
-        return convert_field_to_id(field, registry)
 
 
 @convert_django_field.register(models.UUIDField)
@@ -478,7 +488,7 @@ def convert_postgres_array_to_list(field, registry=None):
 
 
 @convert_django_field.register(HStoreField)
-@convert_django_field.register(JSONField)
+@convert_django_field.register(models.JSONField)
 def convert_json_field_to_string(field, registry=None):
     return JSONString(
         description=get_django_field_description(field), required=not field.null

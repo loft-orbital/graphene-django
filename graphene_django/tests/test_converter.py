@@ -25,7 +25,7 @@ from ..converter import (
 )
 from ..registry import Registry
 from ..types import DjangoObjectType
-from .models import Article, Film, FilmDetails, Reporter
+from .models import Article, Film, FilmDetails, Reporter, TypedIntChoice, TypedStrChoice
 
 # from graphene.core.types.custom_scalars import DateTime, Time, JSONString
 
@@ -53,9 +53,8 @@ def assert_conversion(django_field, graphene_field, *args, **kwargs):
 
 
 def test_should_unknown_django_field_raise_exception():
-    with raises(Exception) as excinfo:
+    with raises(Exception, match="Don't know how to convert the Django field"):
         convert_django_field(None)
-    assert "Don't know how to convert the Django field" in str(excinfo.value)
 
 
 def test_should_date_time_convert_string():
@@ -115,8 +114,7 @@ def test_should_big_auto_convert_id():
 
 
 def test_should_small_auto_convert_id():
-    if hasattr(models, "SmallAutoField"):
-        assert_conversion(models.SmallAutoField, graphene.ID, primary_key=True)
+    assert_conversion(models.SmallAutoField, graphene.ID, primary_key=True)
 
 
 def test_should_uuid_convert_id():
@@ -166,14 +164,34 @@ def test_field_with_choices_convert_enum():
         help_text="Language", choices=(("es", "Spanish"), ("en", "English"))
     )
 
-    class TranslatedModel(models.Model):
+    class ChoicesModel(models.Model):
         language = field
 
         class Meta:
             app_label = "test"
 
     graphene_type = convert_django_field_with_choices(field).type.of_type
-    assert graphene_type._meta.name == "TestTranslatedModelLanguageChoices"
+    assert graphene_type._meta.name == "TestChoicesModelLanguageChoices"
+    assert graphene_type._meta.enum.__members__["ES"].value == "es"
+    assert graphene_type._meta.enum.__members__["ES"].description == "Spanish"
+    assert graphene_type._meta.enum.__members__["EN"].value == "en"
+    assert graphene_type._meta.enum.__members__["EN"].description == "English"
+
+
+def test_field_with_callable_choices_convert_enum():
+    def get_choices():
+        return ("es", "Spanish"), ("en", "English")
+
+    field = models.CharField(help_text="Language", choices=get_choices)
+
+    class CallableChoicesModel(models.Model):
+        language = field
+
+        class Meta:
+            app_label = "test"
+
+    graphene_type = convert_django_field_with_choices(field).type.of_type
+    assert graphene_type._meta.name == "TestCallableChoicesModelLanguageChoices"
     assert graphene_type._meta.enum.__members__["ES"].value == "es"
     assert graphene_type._meta.enum.__members__["ES"].description == "Spanish"
     assert graphene_type._meta.enum.__members__["EN"].value == "en"
@@ -423,35 +441,102 @@ def test_choice_enum_blank_value():
     class ReporterType(DjangoObjectType):
         class Meta:
             model = Reporter
-            fields = (
-                "first_name",
-                "a_choice",
-            )
+            fields = ("callable_choice",)
 
     class Query(graphene.ObjectType):
         reporter = graphene.Field(ReporterType)
 
         def resolve_reporter(root, info):
-            return Reporter.objects.first()
+            # return a model instance with blank choice field value
+            return Reporter(callable_choice="")
 
     schema = graphene.Schema(query=Query)
-
-    # Create model with empty choice option
-    Reporter.objects.create(
-        first_name="Bridget", last_name="Jones", email="bridget@example.com"
-    )
 
     result = schema.execute(
         """
         query {
             reporter {
-                firstName
-                aChoice
+                callableChoice
             }
         }
     """
     )
     assert not result.errors
     assert result.data == {
-        "reporter": {"firstName": "Bridget", "aChoice": None},
+        "reporter": {"callableChoice": None},
     }
+
+
+def test_typed_choice_value():
+    """Test that typed choices fields are resolved correctly to the enum values"""
+
+    class ReporterType(DjangoObjectType):
+        class Meta:
+            model = Reporter
+            fields = ("typed_choice", "class_choice", "callable_choice")
+
+    class Query(graphene.ObjectType):
+        reporter = graphene.Field(ReporterType)
+
+        def resolve_reporter(root, info):
+            # assign choice values to the fields instead of their str or int values
+            return Reporter(
+                typed_choice=TypedIntChoice.CHOICE_THIS,
+                class_choice=TypedIntChoice.CHOICE_THAT,
+                callable_choice=TypedStrChoice.CHOICE_THIS,
+            )
+
+    class CreateReporter(graphene.Mutation):
+        reporter = graphene.Field(ReporterType)
+
+        def mutate(root, info, **kwargs):
+            return CreateReporter(
+                reporter=Reporter(
+                    typed_choice=TypedIntChoice.CHOICE_THIS,
+                    class_choice=TypedIntChoice.CHOICE_THAT,
+                    callable_choice=TypedStrChoice.CHOICE_THIS,
+                ),
+            )
+
+    class Mutation(graphene.ObjectType):
+        create_reporter = CreateReporter.Field()
+
+    schema = graphene.Schema(query=Query, mutation=Mutation)
+
+    reporter_fragment = """
+        fragment reporter on ReporterType {
+            typedChoice
+            classChoice
+            callableChoice
+        }
+    """
+
+    expected_reporter = {
+        "typedChoice": "A_1",
+        "classChoice": "A_2",
+        "callableChoice": "THIS",
+    }
+
+    result = schema.execute(
+        reporter_fragment
+        + """
+        query {
+            reporter { ...reporter }
+        }
+        """
+    )
+    assert not result.errors
+    assert result.data["reporter"] == expected_reporter
+
+    result = schema.execute(
+        reporter_fragment
+        + """
+        mutation {
+            createReporter {
+                reporter { ...reporter }
+            }
+        }
+        """
+    )
+    assert not result.errors
+    assert result.data["createReporter"]["reporter"] == expected_reporter

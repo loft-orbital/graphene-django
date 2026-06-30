@@ -1,5 +1,6 @@
 import base64
 import datetime
+from unittest.mock import ANY, Mock
 
 import pytest
 from django.db import models
@@ -27,6 +28,22 @@ from .models import (
     Pet,
     Reporter,
 )
+
+if IntegerRangeField is not MissingType:
+    from django.contrib.postgres.fields import ArrayField, HStoreField
+
+    # Defined at module level so the model is only registered once, even though the
+    # dataloaders parametrization runs each test of this module twice in the same
+    # process. Unmanaged so the test database setup doesn't try to create a table
+    # with postgres-only column types on sqlite.
+    class Event(models.Model):
+        ages = IntegerRangeField(help_text="The age ranges")
+        data = JSONField(help_text="Data")
+        store = HStoreField()
+        tags = ArrayField(models.CharField(max_length=50))
+
+        class Meta:
+            managed = False
 
 
 @pytest.fixture(autouse=True)
@@ -135,18 +152,6 @@ def test_should_query_well():
 
 @pytest.mark.skipif(IntegerRangeField is MissingType, reason="RangeField should exist")
 def test_should_query_postgres_fields():
-    from django.contrib.postgres.fields import (
-        ArrayField,
-        HStoreField,
-        IntegerRangeField,
-    )
-
-    class Event(models.Model):
-        ages = IntegerRangeField(help_text="The age ranges")
-        data = JSONField(help_text="Data")
-        store = HStoreField()
-        tags = ArrayField(models.CharField(max_length=50))
-
     class EventType(DjangoObjectType):
         class Meta:
             model = Event
@@ -2008,6 +2013,52 @@ def test_connection_should_succeed_if_last_higher_than_number_of_objects():
     assert result.data == expected
 
 
+def test_connection_should_call_resolver_function():
+    resolver_mock = Mock(
+        name="resolver",
+        return_value=[
+            Reporter(first_name="Some", last_name="One"),
+            Reporter(first_name="John", last_name="Doe"),
+        ],
+    )
+
+    class ReporterType(DjangoObjectType):
+        class Meta:
+            model = Reporter
+            fields = "__all__"
+            interfaces = [Node]
+
+    class Query(graphene.ObjectType):
+        reporters = DjangoConnectionField(ReporterType, resolver=resolver_mock)
+
+    schema = graphene.Schema(query=Query)
+    result = schema.execute(
+        """
+        query {
+            reporters {
+                edges {
+                    node {
+                        firstName
+                        lastName
+                    }
+                }
+            }
+        }
+        """
+    )
+
+    resolver_mock.assert_called_once_with(None, ANY)
+    assert not result.errors
+    assert result.data == {
+        "reporters": {
+            "edges": [
+                {"node": {"firstName": "Some", "lastName": "One"}},
+                {"node": {"firstName": "John", "lastName": "Doe"}},
+            ],
+        },
+    }
+
+
 def test_should_query_nullable_foreign_key():
     class PetType(DjangoObjectType):
         class Meta:
@@ -2032,10 +2083,8 @@ def test_should_query_nullable_foreign_key():
     schema = graphene.Schema(query=Query)
 
     person = Person.objects.create(name="Jane")
-    [
-        Pet.objects.create(name="Stray dog", age=1),
-        Pet.objects.create(name="Jane's dog", owner=person, age=1),
-    ]
+    Pet.objects.create(name="Stray dog", age=1)
+    Pet.objects.create(name="Jane's dog", owner=person, age=1)
 
     query_pet = """
         query getPet($name: String!) {
