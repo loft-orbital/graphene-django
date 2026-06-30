@@ -34,9 +34,6 @@ class TypedStrChoice(models.TextChoices):
 
 
 class Person(models.Model):
-    class Meta:
-        ordering = ["pk"]
-
     name = models.CharField(max_length=30)
     parent = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="children"
@@ -44,9 +41,6 @@ class Person(models.Model):
 
 
 class Pet(models.Model):
-    class Meta:
-        ordering = ["pk"]
-
     name = models.CharField(max_length=30)
     age = models.PositiveIntegerField()
     owner = models.ForeignKey(
@@ -66,9 +60,6 @@ class FilmDetails(models.Model):
 
 
 class Film(models.Model):
-    class Meta:
-        ordering = ["pk"]
-
     name = models.CharField(max_length=30)
     genre = models.CharField(
         max_length=2,
@@ -85,9 +76,6 @@ class DoeReporterManager(models.Manager):
 
 
 class Reporter(models.Model):
-    class Meta:
-        ordering = ["pk"]
-
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     email = models.EmailField()

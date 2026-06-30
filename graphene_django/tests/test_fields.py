@@ -2,11 +2,10 @@ import datetime
 import re
 
 import pytest
-from django.db.models import Count, Model, Prefetch
+from django.db.models import Count, Prefetch
 from graphql_sync_dataloaders import DeferredExecutionContext
 
 from graphene import List, NonNull, ObjectType, Schema, String
-from graphene.relay import Node
 
 from ..fields import DjangoConnectionField, DjangoDataloadedListField, DjangoListField
 from ..types import DjangoObjectType
@@ -1004,26 +1003,6 @@ class TestDjangoListField:
 
 
 class TestDjangoConnectionField:
-    def test_model_ordering_assertion(self):
-        class Chaos(Model):
-            class Meta:
-                app_label = "test"
-
-        class ChaosType(DjangoObjectType):
-            class Meta:
-                model = Chaos
-                interfaces = (Node,)
-                fields = "__all__"
-
-        class Query(ObjectType):
-            chaos = DjangoConnectionField(ChaosType)
-
-        with pytest.raises(
-            TypeError,
-            match=r"Django model test\.Chaos has to have a default ordering to be used in a Connection\.",
-        ):
-            Schema(query=Query)
-
     def test_only_django_object_types(self):
         class Query(ObjectType):
             something = DjangoConnectionField(String)

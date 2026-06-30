@@ -229,12 +229,6 @@ class DjangoConnectionField(ConnectionField):
         connection_type = _type._meta.connection
         if non_null:
             return NonNull(connection_type)
-        # Since Relay Connections require to have a predictable ordering for pagination,
-        # check on init that the Django model provided has a default ordering declared.
-        model = connection_type._meta.node._meta.model
-        assert (
-            len(getattr(model._meta, "ordering", [])) > 0
-        ), f"Django model {model._meta.app_label}.{model.__name__} has to have a default ordering to be used in a Connection."
         return connection_type
 
     @property
