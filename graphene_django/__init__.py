@@ -2,7 +2,8 @@ from .fields import DjangoConnectionField, DjangoDataloadedListField, DjangoList
 from .types import DjangoObjectType
 from .utils import bypass_get_queryset
 
-__version__ = "3.2.3"
+# Upstream version: 3.2.3
+__version__ = "1.8.6"
 
 __all__ = [
     "__version__",
