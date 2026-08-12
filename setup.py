@@ -31,12 +31,12 @@ dev_requires = [
 ] + tests_require
 
 setup(
-    name="graphene-django",
+    name="loft-graphene-django",
     version=version,
     description="Graphene Django integration",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/graphql-python/graphene-django",
+    url="https://github.com/loft-orbital/graphene-django",
     author="Syrus Akbary",
     author_email="me@syrusakbary.com",
     license="MIT",
@@ -59,13 +59,13 @@ setup(
     keywords="api graphql protocol rest relay graphene",
     packages=find_packages(exclude=["tests", "examples", "examples.*"]),
     install_requires=[
-        "graphene @ git+https://github.com/graphql-python/graphene.git@ee1ff975d71f6590eb6933d76d12054c9839774a#egg=graphene",
+        "graphene==3.2.0",
         "graphql-core>=3.1.0,<4",
         "graphql-relay>=3.1.1,<4",
-        "graphql-sync-dataloaders @ git+https://github.com/loft-orbital/graphql-sync-dataloaders.git@loft-1.0.3#egg=graphql-sync-dataloaders",
         "Django>=3.2,<6",
         "promise>=2.1",
         "text-unidecode",
+        "loft-graphql-sync-dataloaders==1.0.3",
     ],
     setup_requires=["pytest-runner"],
     tests_require=tests_require,
